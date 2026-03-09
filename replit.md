@@ -6,6 +6,8 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 ## Tech Stack
 - **Frontend**: React 18, Vite, Tailwind CSS, shadcn/ui, Framer Motion, wouter
 - **Backend**: Express.js, PostgreSQL, Drizzle ORM
+- **AI**: OpenAI GPT-4o Vision via Replit AI Integrations (bill analysis)
+- **Payments**: PayFast recurring subscriptions (MD5 signature verification, ITN webhook)
 - **Auth**: Session-based (express-session + scrypt hashing)
 - **State**: TanStack React Query
 
@@ -14,12 +16,16 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `server/db.ts` - PostgreSQL connection pool
 - `server/storage.ts` - Database storage layer (IStorage interface with RLS-style scoped queries)
 - `server/routes.ts` - Express API routes with session auth + estate membership verification
+- `server/openai-bill-analyzer.ts` - GPT-4o Vision bill analysis (base64 image → structured JSON)
+- `server/payfast.ts` - PayFast URL builder + ITN signature verification + webhook validation
 - `server/seed.ts` - Seed data for demo (admin@koneksi.app / admin123, demo@koneksi.app / demo123, supplier@koneksi.app / supplier123)
 - `client/src/lib/auth.tsx` - Auth context provider (useAuth hook)
 - `client/src/lib/theme.tsx` - Dark/light theme provider with system preference detection
 - `client/src/lib/estate-context.tsx` - Multi-tenant estate context with localStorage persistence
   - Exports: `useEstate`, `useCurrentEstate`, `useEstatesList`, `useJoinEstate`
 - `client/src/hooks/use-user-profile.ts` - useUserProfile hook for profile data and mutations
+- `client/src/hooks/use-bill-analysis.ts` - useBillAnalysis hook (file upload → OpenAI analysis → save)
+- `client/src/hooks/use-subscription.ts` - useSubscription hook (tier subscribe/upgrade → PayFast redirect)
 
 ## Multi-Tenant Architecture
 - Estate selector in header with "Personal" option (no estate) + all user's estates

@@ -41,8 +41,9 @@ export function useBillAnalysis() {
         body: formData,
         credentials: "include",
       });
+
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({ message: "Analysis failed" }));
         throw new Error(err.message || "Analysis failed");
       }
       return res.json();
@@ -53,10 +54,14 @@ export function useBillAnalysis() {
       if (currentEstate) {
         queryClient.invalidateQueries({ queryKey: [`/api/bills?estateId=${currentEstate.id}`] });
       }
-      toast({ title: "Analysis complete", description: "Your bill has been analyzed" });
+      toast({ title: "Analysis complete", description: "Your bill has been analyzed by AI" });
     },
     onError: (err: any) => {
-      toast({ title: "Analysis failed", description: err.message, variant: "destructive" });
+      toast({
+        title: "Analysis failed",
+        description: err.message || "Could not analyze this bill. Try uploading a clearer photo.",
+        variant: "destructive",
+      });
     },
   });
 

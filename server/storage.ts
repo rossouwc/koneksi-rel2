@@ -52,6 +52,7 @@ export interface IStorage {
 
   getSubscriptionTiers(): Promise<SubscriptionTier[]>;
   getProviderSubscription(providerId: string): Promise<ProviderSubscription | undefined>;
+  getProviderSubscriptionById(id: string): Promise<ProviderSubscription | undefined>;
   upsertProviderSubscription(sub: InsertProviderSubscription): Promise<ProviderSubscription>;
   updateProviderSubscription(id: string, data: Partial<ProviderSubscription>): Promise<ProviderSubscription>;
   getProviderVisibleEstates(providerId: string): Promise<ProviderVisibleEstate[]>;
@@ -245,6 +246,11 @@ export class DatabaseStorage implements IStorage {
 
   async getProviderSubscription(providerId: string): Promise<ProviderSubscription | undefined> {
     const [sub] = await db.select().from(providerSubscriptions).where(eq(providerSubscriptions.providerId, providerId));
+    return sub;
+  }
+
+  async getProviderSubscriptionById(id: string): Promise<ProviderSubscription | undefined> {
+    const [sub] = await db.select().from(providerSubscriptions).where(eq(providerSubscriptions.id, id));
     return sub;
   }
 

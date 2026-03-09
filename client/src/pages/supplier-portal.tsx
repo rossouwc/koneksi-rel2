@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/hooks/use-subscription";
 import confetti from "canvas-confetti";
 import {
   Crown,
@@ -17,10 +18,10 @@ import {
   MapPin,
   Globe2,
   Plus,
-  ChevronRight,
   Sparkles,
   Shield,
   Zap,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -175,6 +176,7 @@ function SubscribeFlow({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const { subscribe } = useSubscription();
   const [selectedTierId, setSelectedTierId] = useState(provider.subscription?.tierId || "");
   const [selectedEstateIds, setSelectedEstateIds] = useState<string[]>(provider.visibleEstateIds || []);
   const [selectedCity, setSelectedCity] = useState(provider.subscription?.selectedCity || "");
@@ -186,27 +188,6 @@ function SubscribeFlow({
 
   const selectedTier = tiers.find((t) => t.id === selectedTierId);
 
-  const subscribeMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/supplier/subscribe", data);
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/supplier/dashboard"] });
-      if (data.paymentRequired && data.paymentUrl) {
-        toast({ title: "Redirecting to PayFast..." });
-        window.open(data.paymentUrl, "_blank");
-      } else {
-        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
-        toast({ title: "Subscription updated!" });
-      }
-      onSuccess();
-    },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-  });
-
   const toggleEstate = (estateId: string) => {
     const maxEstates = selectedTier?.maxEstates || 1;
     setSelectedEstateIds((prev) => {
@@ -217,13 +198,27 @@ function SubscribeFlow({
   };
 
   const handleSubscribe = () => {
-    subscribeMutation.mutate({
-      providerId: provider.id,
-      tierId: selectedTierId,
-      selectedCity: selectedCity || null,
-      selectedProvince: selectedProvince || null,
-      selectedEstateIds: selectedTier?.scopeType === "estate" ? selectedEstateIds : undefined,
-    });
+    subscribe.mutate(
+      {
+        providerId: provider.id,
+        tierId: selectedTierId,
+        selectedCity: selectedCity || null,
+        selectedProvince: selectedProvince || null,
+        selectedEstateIds: selectedTier?.scopeType === "estate" ? selectedEstateIds : undefined,
+      },
+      {
+        onSuccess: (data) => {
+          if (data.paymentRequired && data.paymentUrl) {
+            toast({ title: "Redirecting to PayFast for payment..." });
+            window.location.href = data.paymentUrl;
+          } else {
+            confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+            toast({ title: "Subscription updated!" });
+            onSuccess();
+          }
+        },
+      }
+    );
   };
 
   return (
@@ -359,11 +354,11 @@ function SubscribeFlow({
 
           <Button
             className="w-full rounded-xl gradient-teal text-white"
-            disabled={subscribeMutation.isPending}
+            disabled={subscribe.isPending}
             onClick={handleSubscribe}
             data-testid="button-confirm-subscribe"
           >
-            {subscribeMutation.isPending
+            {subscribe.isPending
               ? "Processing..."
               : selectedTier.monthlyPrice === 0
                 ? "Confirm Free Plan"
@@ -447,6 +442,20 @@ function ProviderDashboardCard({ provider }: { provider: SupplierProvider }) {
           </div>
         )}
 
+        {provider.subscription?.status === "pending" && (
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <Clock className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Payment pending — awaiting PayFast confirmation</span>
+          </div>
+        )}
+
+        {provider.subscription?.status === "failed" && (
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+            <Zap className="w-3.5 h-3.5 text-red-500" />
+            <span className="text-xs text-red-600 dark:text-red-400 font-medium">Payment failed — please try again</span>
+          </div>
+        )}
+
         <Button
           variant="outline"
           className="w-full rounded-xl"
@@ -480,11 +489,25 @@ function ProviderDashboardCard({ provider }: { provider: SupplierProvider }) {
 
 export default function SupplierPortalPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { data: dashboard, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/supplier/dashboard"],
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get("payment");
+    if (payment === "success") {
+      toast({ title: "Payment received!", description: "Your subscription will activate shortly once PayFast confirms payment." });
+      queryClient.invalidateQueries({ queryKey: ["/api/supplier/dashboard"] });
+      window.history.replaceState({}, "", "/supplier");
+    } else if (payment === "cancelled") {
+      toast({ title: "Payment cancelled", description: "Your subscription was not changed.", variant: "destructive" });
+      window.history.replaceState({}, "", "/supplier");
+    }
+  }, [toast]);
 
   if (user?.role !== "supplier") {
     return (

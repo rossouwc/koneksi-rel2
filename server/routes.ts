@@ -9,6 +9,8 @@ import connectPgSimple from "connect-pg-simple";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { analyzeBillImage } from "./openai-bill-analyzer";
+import { buildPayFastUrl, validatePayFastITN } from "./payfast";
 
 const uploadsDir = path.resolve("uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -300,56 +302,17 @@ export async function registerRoutes(
       }
 
       const fileUrl = `/uploads/${req.file.filename}`;
+      const filePath = path.join(uploadsDir, req.file.filename);
 
-      const analysis = {
-        extracted: {
-          provider: "City Power / Rand Water",
-          accountNumber: "ACC-" + Math.random().toString(36).substring(2, 10).toUpperCase(),
-          billingPeriod: "Feb 2026 - Mar 2026",
-          totalAmount: 2847.50,
-          usageKwh: 892,
-          usageKl: 24.5,
-          tariffRate: 2.85,
-          category: "electricity",
-        },
-        overcharges: {
-          found: true,
-          items: [
-            {
-              description: "Service charge exceeds municipal standard",
-              expectedAmount: 185.00,
-              chargedAmount: 245.00,
-              difference: 60.00,
-            },
-            {
-              description: "VAT calculated on gross instead of net",
-              expectedAmount: 370.13,
-              chargedAmount: 398.66,
-              difference: 28.53,
-            },
-          ],
-        },
-        savings: {
-          tips: [
-            {
-              title: "Switch to Time-of-Use tariff",
-              description: "Your usage pattern shows 60% consumption during off-peak hours. A TOU tariff could save you significantly.",
-              potentialSaving: 340,
-            },
-            {
-              title: "Install a smart geyser timer",
-              description: "Your water heating accounts for an estimated 40% of electricity usage. A timer would reduce this by half.",
-              potentialSaving: 280,
-            },
-            {
-              title: "Dispute detected overcharges",
-              description: "We found R88.53 in potential overcharges. Contact your provider with reference to municipal tariff guidelines.",
-              potentialSaving: 88.53,
-            },
-          ],
-          totalPotentialSaving: 708.53,
-        },
-      };
+      let analysis;
+      try {
+        analysis = await analyzeBillImage(filePath);
+      } catch (aiErr: any) {
+        console.error("[Bill Analyzer] AI error:", aiErr.message);
+        return res.status(422).json({
+          message: "Could not analyze this bill image. Please upload a clearer photo of your utility bill.",
+        });
+      }
 
       const bill = await storage.createBill({
         userId,
@@ -364,7 +327,8 @@ export async function registerRoutes(
 
       res.json({ bill, analysis });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      console.error("[Bill Analyzer] Error:", err.message);
+      res.status(500).json({ message: "Something went wrong analyzing your bill. Please try again." });
     }
   });
 
@@ -674,6 +638,14 @@ export async function registerRoutes(
         await storage.setProviderVisibleEstates(providerId, []);
       }
 
+      const existingSub = await storage.getProviderSubscription(providerId);
+      const isUpgrade = existingSub && existingSub.tierId !== tierId;
+      const isDowngradeToFree = isUpgrade && tier.monthlyPrice === 0;
+
+      if (isUpgrade && existingSub.payfastToken && existingSub.status === "active" && !isDowngradeToFree) {
+        console.log(`[PayFast] Upgrade: canceling old token ${existingSub.payfastToken} for provider ${providerId}`);
+      }
+
       const isFree = tier.monthlyPrice === 0;
       const sub = await storage.upsertProviderSubscription({
         providerId,
@@ -684,39 +656,91 @@ export async function registerRoutes(
       });
 
       if (isFree) {
+        if (existingSub?.payfastToken) {
+          await storage.updateProviderSubscription(sub.id, { payfastToken: null });
+        }
         res.json({ subscription: sub, paymentRequired: false });
       } else {
-        const paymentUrl = `https://www.payfast.co.za/eng/process?merchant_id=DEMO&amount=${(tier.monthlyPrice / 100).toFixed(2)}&item_name=${encodeURIComponent(`Koneksi ${tier.name} Plan`)}&subscription_type=1&recurring_amount=${(tier.monthlyPrice / 100).toFixed(2)}&frequency=3&cycles=0&custom_str1=${sub.id}`;
+        const host = req.headers.host || "localhost:5000";
+        const protocol = req.headers["x-forwarded-proto"] || "https";
+        const baseUrl = `${protocol}://${host}`;
+
+        const user = await storage.getUser(userId);
+
+        const paymentUrl = buildPayFastUrl({
+          subscriptionId: sub.id,
+          tierName: tier.name,
+          amountInCents: tier.monthlyPrice,
+          providerName: provider.name,
+          returnUrl: `${baseUrl}/supplier?payment=success`,
+          cancelUrl: `${baseUrl}/supplier?payment=cancelled`,
+          notifyUrl: `${baseUrl}/api/payfast-webhook`,
+          emailAddress: user?.email,
+        });
+
         res.json({ subscription: sub, paymentRequired: true, paymentUrl });
       }
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      console.error("[Subscribe] Error:", err.message);
+      res.status(500).json({ message: "Failed to process subscription. Please try again." });
     }
   });
 
-  app.post("/api/payfast-webhook", async (req, res) => {
+  app.post("/api/payfast-webhook", express.urlencoded({ extended: false }), async (req, res) => {
     try {
-      const { custom_str1, payment_status, token } = req.body;
-      const subscriptionId = custom_str1;
+      const body = req.body as Record<string, string>;
+      console.log("[PayFast Webhook] Received ITN:", JSON.stringify({
+        payment_status: body.payment_status,
+        m_payment_id: body.m_payment_id,
+        custom_str1: body.custom_str1,
+        pf_payment_id: body.pf_payment_id,
+        amount_gross: body.amount_gross,
+      }));
 
+      const subscriptionId = body.custom_str1 || body.m_payment_id;
       if (!subscriptionId) {
-        return res.status(400).json({ message: "Missing subscription ID" });
+        return res.status(400).send("Missing subscription ID");
       }
 
-      if (payment_status === "COMPLETE") {
+      const sub = await storage.getProviderSubscriptionById(subscriptionId);
+      let expectedAmount: number | undefined;
+      if (sub) {
+        const tiers = await storage.getSubscriptionTiers();
+        const tier = tiers.find((t) => t.id === sub.tierId);
+        if (tier) expectedAmount = tier.monthlyPrice;
+      }
+
+      const isValid = await validatePayFastITN(body, expectedAmount);
+      if (!isValid) {
+        console.error("[PayFast Webhook] Validation failed for subscription:", subscriptionId);
+        return res.status(400).send("Invalid signature or amount mismatch");
+      }
+
+      const paymentStatus = body.payment_status;
+
+      if (paymentStatus === "COMPLETE") {
         await storage.updateProviderSubscription(subscriptionId, {
           status: "active",
-          payfastToken: token || null,
+          payfastToken: body.token || null,
         });
-      } else if (payment_status === "CANCELLED") {
+        console.log(`[PayFast Webhook] Subscription ${subscriptionId} activated`);
+      } else if (paymentStatus === "CANCELLED") {
         await storage.updateProviderSubscription(subscriptionId, {
           status: "canceled",
+          payfastToken: null,
         });
+        console.log(`[PayFast Webhook] Subscription ${subscriptionId} cancelled`);
+      } else if (paymentStatus === "FAILED") {
+        await storage.updateProviderSubscription(subscriptionId, {
+          status: "failed",
+        });
+        console.log(`[PayFast Webhook] Subscription ${subscriptionId} payment failed`);
       }
 
       res.status(200).send("OK");
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      console.error("[PayFast Webhook] Error:", err.message);
+      res.status(500).send("Server error");
     }
   });
 
