@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff, Briefcase, Phone, Globe, X, ChevronDown } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff, Briefcase, Phone, Globe, X, ChevronDown, Building2, MapPin } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 
@@ -23,9 +23,21 @@ const SERVICE_OPTIONS = [
   "Water Purification",
 ];
 
+const SA_PROVINCES = [
+  "Gauteng",
+  "Western Cape",
+  "KwaZulu-Natal",
+  "Eastern Cape",
+  "Free State",
+  "Limpopo",
+  "Mpumalanga",
+  "North West",
+  "Northern Cape",
+];
+
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [registerType, setRegisterType] = useState<"resident" | "supplier">("resident");
+  const [registerType, setRegisterType] = useState<"resident" | "estate" | "supplier">("resident");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -39,6 +51,12 @@ export default function AuthPage() {
   const [contactEmail, setContactEmail] = useState("");
   const [customService, setCustomService] = useState("");
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+
+  const [estateName, setEstateName] = useState("");
+  const [estateSuburb, setEstateSuburb] = useState("");
+  const [estateCity, setEstateCity] = useState("");
+  const [estateProvince, setEstateProvince] = useState("");
+  const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
 
   const { login, register } = useAuth();
   const { toast } = useToast();
@@ -91,6 +109,24 @@ export default function AuthPage() {
           title: "Account Submitted",
           description: "We'll review and notify you soon.",
         });
+      } else if (registerType === "estate") {
+        if (!estateName.trim()) {
+          throw new Error("Estate/Complex name is required");
+        }
+        if (!fullName.trim()) {
+          throw new Error("Your full name is required");
+        }
+        await register(email, password, fullName, {
+          registerAs: "estate_admin",
+          estateName: estateName.trim(),
+          estateSuburb: estateSuburb.trim() || undefined,
+          estateCity: estateCity.trim() || undefined,
+          estateProvince: estateProvince || undefined,
+        });
+        toast({
+          title: "Estate Registered",
+          description: "Your estate has been created. Share the invite code with residents.",
+        });
       } else {
         await register(email, password, fullName);
       }
@@ -113,8 +149,24 @@ export default function AuthPage() {
   };
 
   const isSupplierMode = mode === "register" && registerType === "supplier";
+  const isEstateMode = mode === "register" && registerType === "estate";
+  const isResidentMode = mode === "register" && registerType === "resident";
+  const showGoogle = mode === "login" || isResidentMode;
 
   const inputClass = "pl-10 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent";
+
+  const registerTypes = [
+    { key: "resident" as const, label: "Resident", icon: User },
+    { key: "estate" as const, label: "Estate", icon: Building2 },
+    { key: "supplier" as const, label: "Supplier", icon: Briefcase },
+  ];
+
+  const getSubmitLabel = () => {
+    if (mode === "login") return "Sign In";
+    if (isSupplierMode) return "Submit for Approval";
+    if (isEstateMode) return "Register Estate";
+    return "Create Account";
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
@@ -191,55 +243,49 @@ export default function AuthPage() {
               >
                 <Label className="text-white/90 text-sm mb-2 block">Register as</Label>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    data-testid="button-register-resident"
-                    onClick={() => setRegisterType("resident")}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                      registerType === "resident"
-                        ? "bg-white/20 text-white border border-white/30"
-                        : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
-                    }`}
-                  >
-                    <User className="w-4 h-4" />
-                    Resident
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="button-register-supplier"
-                    onClick={() => setRegisterType("supplier")}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                      registerType === "supplier"
-                        ? "bg-white/20 text-white border border-white/30"
-                        : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
-                    }`}
-                  >
-                    <Briefcase className="w-4 h-4" />
-                    Supplier
-                  </button>
+                  {registerTypes.map(({ key, label, icon: Icon }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      data-testid={`button-register-${key}`}
+                      onClick={() => setRegisterType(key)}
+                      className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
+                        registerType === key
+                          ? "bg-white/20 text-white border border-white/30"
+                          : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <button
-            onClick={handleGoogleAuth}
-            data-testid="button-google-auth"
-            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl bg-white/10 border border-white/15 text-white font-medium text-sm hover:bg-white/15 transition-all duration-200 mb-5"
-          >
-            <SiGoogle className="w-4 h-4" />
-            Continue with Google
-          </button>
+          {showGoogle && (
+            <>
+              <button
+                onClick={handleGoogleAuth}
+                data-testid="button-google-auth"
+                className="w-full flex items-center justify-center gap-3 py-3 rounded-xl bg-white/10 border border-white/15 text-white font-medium text-sm hover:bg-white/15 transition-all duration-200 mb-5"
+              >
+                <SiGoogle className="w-4 h-4" />
+                Continue with Google
+              </button>
 
-          <div className="flex items-center gap-3 mb-5">
-            <div className="flex-1 h-px bg-white/20" />
-            <span className="text-white/40 text-xs uppercase tracking-wider">or</span>
-            <div className="flex-1 h-px bg-white/20" />
-          </div>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="flex-1 h-px bg-white/20" />
+                <span className="text-white/40 text-xs uppercase tracking-wider">or</span>
+                <div className="flex-1 h-px bg-white/20" />
+              </div>
+            </>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <AnimatePresence mode="wait">
-              {mode === "register" && !isSupplierMode && (
+              {mode === "register" && (isResidentMode || isEstateMode) && (
                 <motion.div
                   key="name-field"
                   initial={{ opacity: 0, height: 0 }}
@@ -247,7 +293,9 @@ export default function AuthPage() {
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Label className="text-white/90 text-sm mb-1.5 block">Full Name</Label>
+                  <Label className="text-white/90 text-sm mb-1.5 block">
+                    {isEstateMode ? "Your Full Name (Admin)" : "Full Name"} {isEstateMode && <span className="text-red-400">*</span>}
+                  </Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                     <Input
@@ -256,8 +304,117 @@ export default function AuthPage() {
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Your full name"
                       className={inputClass}
-                      required={mode === "register" && !isSupplierMode}
+                      required
                     />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence mode="wait">
+              {isEstateMode && (
+                <motion.div
+                  key="estate-fields"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <Label className="text-white/90 text-sm mb-1.5 block">
+                      Estate / Complex Name <span className="text-red-400">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <Input
+                        data-testid="input-estate-name"
+                        value={estateName}
+                        onChange={(e) => setEstateName(e.target.value)}
+                        placeholder="e.g. Greenwood Estate"
+                        className={inputClass}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-white/90 text-sm mb-1.5 block">Suburb</Label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <Input
+                        data-testid="input-estate-suburb"
+                        value={estateSuburb}
+                        onChange={(e) => setEstateSuburb(e.target.value)}
+                        placeholder="e.g. Sandton"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-white/90 text-sm mb-1.5 block">City</Label>
+                      <Input
+                        data-testid="input-estate-city"
+                        value={estateCity}
+                        onChange={(e) => setEstateCity(e.target.value)}
+                        placeholder="e.g. Johannesburg"
+                        className="bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-white/90 text-sm mb-1.5 block">Province</Label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          data-testid="button-province-dropdown"
+                          onClick={() => setShowProvinceDropdown(!showProvinceDropdown)}
+                          className="w-full flex items-center justify-between py-2 px-3 bg-white/10 border border-white/15 text-sm rounded-xl hover:bg-white/15 transition-all h-10"
+                        >
+                          <span className={estateProvince ? "text-white" : "text-white/40"}>
+                            {estateProvince || "Select"}
+                          </span>
+                          <ChevronDown className={`w-3.5 h-3.5 text-white/40 transition-transform ${showProvinceDropdown ? "rotate-180" : ""}`} />
+                        </button>
+
+                        <AnimatePresence>
+                          {showProvinceDropdown && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -4 }}
+                              transition={{ duration: 0.15 }}
+                              className="absolute z-50 w-full mt-1 rounded-xl overflow-hidden max-h-40 overflow-y-auto"
+                              style={{
+                                background: "rgba(30, 60, 55, 0.95)",
+                                backdropFilter: "blur(16px)",
+                                border: "1px solid rgba(255, 255, 255, 0.15)",
+                              }}
+                            >
+                              {SA_PROVINCES.map((prov) => (
+                                <button
+                                  key={prov}
+                                  type="button"
+                                  data-testid={`option-province-${prov.toLowerCase().replace(/\s+/g, "-")}`}
+                                  onClick={() => {
+                                    setEstateProvince(prov);
+                                    setShowProvinceDropdown(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                                    estateProvince === prov
+                                      ? "bg-teal-500/30 text-white"
+                                      : "text-white/70 hover:bg-white/10"
+                                  }`}
+                                >
+                                  {prov}
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -508,7 +665,7 @@ export default function AuthPage() {
                 type="submit"
                 disabled={isSubmitting}
                 className={`w-full rounded-xl font-semibold py-6 text-base transition-all duration-200 ${
-                  isSupplierMode
+                  isSupplierMode || isEstateMode
                     ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-400 hover:to-emerald-400"
                     : "bg-white text-teal-700 hover:bg-white/90"
                 }`}
@@ -522,11 +679,7 @@ export default function AuthPage() {
                   </motion.div>
                 ) : (
                   <span className="flex items-center gap-2">
-                    {mode === "login"
-                      ? "Sign In"
-                      : isSupplierMode
-                        ? "Submit for Approval"
-                        : "Create Account"}
+                    {getSubmitLabel()}
                     <ArrowRight className="w-4 h-4" />
                   </span>
                 )}

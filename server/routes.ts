@@ -12,7 +12,7 @@ import fs from "fs";
 import { analyzeBillImage } from "./openai-bill-analyzer";
 import { buildPayFastUrl, validatePayFastITN } from "./payfast";
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, estates, userEstates } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const uploadsDir = path.resolve("uploads");
@@ -117,7 +117,7 @@ export async function registerRoutes(
 
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, password, fullName, registerAs, businessName, businessWebsite, services, phone, contactEmail } = req.body;
+      const { email, password, fullName, registerAs, businessName, businessWebsite, services, phone, contactEmail, estateName, estateSuburb, estateCity, estateProvince } = req.body;
       if (!email || !password || !fullName) {
         return res.status(400).json({ message: "Missing required fields" });
       }
@@ -131,40 +131,70 @@ export async function registerRoutes(
         }
       }
 
+      if (registerAs === "estate_admin") {
+        if (!estateName) {
+          return res.status(400).json({ message: "Estate/Complex name is required" });
+        }
+      }
+
       const existing = await storage.getUserByEmail(email);
       if (existing) {
         return res.status(400).json({ message: "Email already registered" });
       }
 
       const hashedPassword = await hashPassword(password);
-      const isSupplier = registerAs === "supplier";
 
-      const userData: any = {
-        email,
-        password: hashedPassword,
-        fullName: isSupplier ? businessName : fullName,
-        phone: isSupplier ? phone : undefined,
-      };
-
-      if (isSupplier) {
-        userData.businessName = businessName;
-        userData.businessWebsite = businessWebsite || null;
-        userData.services = services;
-      }
-
-      let user;
-      if (isSupplier) {
-        const [created] = await db.insert(users).values({
-          ...userData,
+      if (registerAs === "supplier") {
+        const [user] = await db.insert(users).values({
+          email,
+          password: hashedPassword,
+          fullName: businessName,
+          phone,
+          businessName,
+          businessWebsite: businessWebsite || null,
+          services,
           role: "supplier" as const,
           approvalStatus: "pending",
           profileComplete: true,
         }).returning();
-        user = created;
-      } else {
-        user = await storage.createUser(userData);
+
+        req.session.userId = user.id;
+        return res.json({ ...user, password: undefined });
       }
 
+      if (registerAs === "estate_admin") {
+        const result = await db.transaction(async (tx) => {
+          const [user] = await tx.insert(users).values({
+            email,
+            password: hashedPassword,
+            fullName,
+            role: "estate_admin" as const,
+            profileComplete: true,
+          }).returning();
+
+          const inviteCode = (await import("crypto")).randomUUID().slice(0, 8).toUpperCase();
+          const [estate] = await tx.insert(estates).values({
+            name: estateName,
+            suburb: estateSuburb || null,
+            city: estateCity || null,
+            province: estateProvince || null,
+            inviteCode,
+          }).returning();
+
+          await tx.insert(userEstates).values({
+            userId: user.id,
+            estateId: estate.id,
+            roleInEstate: "estate_admin" as const,
+          });
+
+          return user;
+        });
+
+        req.session.userId = result.id;
+        return res.json({ ...result, password: undefined });
+      }
+
+      const user = await storage.createUser({ email, password: hashedPassword, fullName });
       req.session.userId = user.id;
       res.json({ ...user, password: undefined });
     } catch (err: any) {

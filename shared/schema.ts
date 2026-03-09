@@ -144,20 +144,27 @@ export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   fullName: z.string().min(2),
-  registerAs: z.enum(["resident", "supplier"]).default("resident"),
+  registerAs: z.enum(["resident", "supplier", "estate_admin"]).default("resident"),
   businessName: z.string().min(2).optional(),
   businessWebsite: z.string().url().optional().or(z.literal("")),
   services: z.array(z.string()).optional(),
   phone: z.string().min(6).optional(),
   contactEmail: z.string().email().optional().or(z.literal("")),
+  estateName: z.string().min(2).optional(),
+  estateSuburb: z.string().optional(),
+  estateCity: z.string().optional(),
+  estateProvince: z.string().optional(),
 }).refine(
   (data) => {
     if (data.registerAs === "supplier") {
       return !!data.businessName && data.services && data.services.length > 0;
     }
+    if (data.registerAs === "estate_admin") {
+      return !!data.estateName;
+    }
     return true;
   },
-  { message: "Business name and at least one service are required for suppliers" }
+  { message: "Required fields missing for selected registration type" }
 );
 
 export const profileSetupSchema = z.object({

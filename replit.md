@@ -19,7 +19,8 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `server/openai-bill-analyzer.ts` - GPT-4o Vision bill analysis (base64 image → structured JSON)
 - `server/payfast.ts` - PayFast URL builder + ITN signature verification + webhook validation
 - `server/seed.ts` - Seed data for demo (admin@koneksi.app / admin123, demo@koneksi.app / demo123, supplier@koneksi.app / supplier123)
-- `client/src/lib/auth.tsx` - Auth context provider (useAuth hook)
+- `client/src/pages/pending-approval.tsx` - Pending supplier approval page (shown when supplier.approvalStatus='pending')
+- `client/src/lib/auth.tsx` - Auth context provider (useAuth hook, supports resident/estate/supplier registration)
 - `client/src/lib/theme.tsx` - Dark/light theme provider with system preference detection
 - `client/src/lib/estate-context.tsx` - Multi-tenant estate context with localStorage persistence
   - Exports: `useEstate`, `useCurrentEstate`, `useEstatesList`, `useJoinEstate`
@@ -69,6 +70,11 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - Profile setup flow redirects new users before dashboard access
 - Password visibility toggle on auth form
 - Submit animations (whileTap scale, spinning sparkles)
+- Registration type selector: Resident / Estate / Supplier (3-button toggle)
+  - Resident: standard signup with Google option
+  - Estate: creates user (estate_admin) + estate + membership in one atomic transaction; fields: admin name, estate name, suburb, city, province
+  - Supplier: creates user with approvalStatus=pending, shows pending-approval page; fields: business name, website, services (multi-select chips), phone, contact email
+- Google OAuth button only visible for login and resident registration (hidden for estate/supplier)
 - Google OAuth button (visual placeholder, shows "Coming Soon" toast)
 - Forgot password link (shows informational toast)
 - Savings Tracker: animated counter, Recharts area chart (6-month contiguous series), expandable bill history (capped at 20), personal/estate toggle, canvas-confetti on savings detected

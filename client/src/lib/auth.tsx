@@ -12,11 +12,21 @@ interface SupplierRegistrationData {
   contactEmail?: string;
 }
 
+interface EstateRegistrationData {
+  registerAs: "estate_admin";
+  estateName: string;
+  estateSuburb?: string;
+  estateCity?: string;
+  estateProvince?: string;
+}
+
+type ExtraRegistrationData = SupplierRegistrationData | EstateRegistrationData;
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string, supplierData?: SupplierRegistrationData) => Promise<void>;
+  register: (email: string, password: string, fullName: string, extraData?: ExtraRegistrationData) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -48,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; fullName: string } & Partial<SupplierRegistrationData>) => {
+    mutationFn: async (data: { email: string; password: string; fullName: string } & Partial<ExtraRegistrationData>) => {
       await apiRequest("POST", "/api/auth/register", data);
     },
     onSuccess: () => {
@@ -69,8 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loginMutation.mutateAsync({ email, password });
   };
 
-  const register = async (email: string, password: string, fullName: string, supplierData?: SupplierRegistrationData) => {
-    await registerMutation.mutateAsync({ email, password, fullName, ...supplierData });
+  const register = async (email: string, password: string, fullName: string, extraData?: ExtraRegistrationData) => {
+    await registerMutation.mutateAsync({ email, password, fullName, ...extraData });
   };
 
   const logout = async () => {
