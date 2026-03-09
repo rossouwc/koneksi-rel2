@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff, Briefcase, Phone, Globe, X, ChevronDown, Building2, MapPin } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff, Briefcase, Phone, Globe, X, ChevronDown, Building2, MapPin, CheckCircle2 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 
@@ -48,8 +49,28 @@ export default function AuthPage() {
   const [estateProvince, setEstateProvince] = useState("");
   const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
 
+  const [existingUserFound, setExistingUserFound] = useState<{ exists: boolean; fullName: string | null } | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+
   const { login, register } = useAuth();
   const { toast } = useToast();
+
+  const checkEmailExists = useCallback(async (emailToCheck: string) => {
+    if (!emailToCheck || mode !== "register" || registerType === "resident") {
+      setExistingUserFound(null);
+      return;
+    }
+    setCheckingEmail(true);
+    try {
+      const res = await apiRequest("POST", "/api/auth/check-email", { email: emailToCheck });
+      const data = await res.json();
+      setExistingUserFound(data);
+    } catch {
+      setExistingUserFound(null);
+    } finally {
+      setCheckingEmail(false);
+    }
+  }, [mode, registerType]);
 
   const toggleService = (service: string) => {
     setServices((prev) =>
@@ -87,32 +108,36 @@ export default function AuthPage() {
         if (!phone.trim()) {
           throw new Error("Phone number is required");
         }
-        await register(email, password, fullName || businessName, {
+        const isExisting = existingUserFound?.exists === true;
+        await register(email, password, isExisting ? (existingUserFound?.fullName || businessName) : (fullName || businessName), {
           registerAs: "supplier",
           businessName: businessName.trim(),
           businessWebsite: businessWebsite.trim() || undefined,
           services,
           phone: phone.trim(),
           contactEmail: contactEmail.trim() || undefined,
+          existingUser: isExisting,
         });
         toast({
-          title: "Account Submitted",
-          description: "We'll review and notify you soon.",
+          title: isExisting ? "Supplier Profile Created" : "Account Submitted",
+          description: isExisting ? "Your supplier profile has been submitted for review." : "We'll review and notify you soon.",
         });
       } else if (registerType === "estate") {
         if (!estateName.trim()) {
           throw new Error("Estate/Complex name is required");
         }
-        if (!fullName.trim()) {
+        const isExisting = existingUserFound?.exists === true;
+        if (!isExisting && !fullName.trim()) {
           throw new Error("Your full name is required");
         }
-        await register(email, password, fullName, {
+        await register(email, password, isExisting ? (existingUserFound?.fullName || fullName) : fullName, {
           registerAs: "estate_admin",
           estateName: estateName.trim(),
           estateStreetName: estateStreetName.trim() || undefined,
           estateSuburb: estateSuburb.trim() || undefined,
           estateCity: estateCity.trim() || undefined,
           estateProvince: estateProvince || undefined,
+          existingUser: isExisting,
         });
         toast({
           title: "Estate Registered",
@@ -209,7 +234,7 @@ export default function AuthPage() {
             {(["login", "register"] as const).map((m) => (
               <button
                 key={m}
-                onClick={() => setMode(m)}
+                onClick={() => { setMode(m); setExistingUserFound(null); }}
                 data-testid={`button-${m}-tab`}
                 className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${
                   mode === m
@@ -239,7 +264,7 @@ export default function AuthPage() {
                       key={key}
                       type="button"
                       data-testid={`button-register-${key}`}
-                      onClick={() => setRegisterType(key)}
+                      onClick={() => { setRegisterType(key); setExistingUserFound(null); }}
                       className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
                         registerType === key
                           ? "bg-white/20 text-white border border-white/30"
@@ -276,7 +301,7 @@ export default function AuthPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <AnimatePresence mode="wait">
-              {mode === "register" && (isResidentMode || isEstateMode) && (
+              {mode === "register" && (isResidentMode || (isEstateMode && !existingUserFound?.exists)) && (
                 <motion.div
                   key="name-field"
                   initial={{ opacity: 0, height: 0 }}
@@ -614,17 +639,40 @@ export default function AuthPage() {
                   data-testid="input-email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setExistingUserFound(null);
+                  }}
+                  onBlur={() => checkEmailExists(email)}
                   placeholder="you@example.com"
                   className={inputClass}
                   required
                 />
               </div>
+              <AnimatePresence>
+                {mode === "register" && (isEstateMode || isSupplierMode) && existingUserFound?.exists && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/30"
+                    data-testid="text-existing-user-found"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <p className="text-xs text-emerald-200">
+                      Account found for <span className="font-semibold">{existingUserFound.fullName}</span>. Enter your password to verify and continue.
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <Label className="text-white/90 text-sm">Password</Label>
+                <Label className="text-white/90 text-sm">
+                  {existingUserFound?.exists && (isEstateMode || isSupplierMode) ? "Verify Password" : "Password"}
+                </Label>
                 {mode === "login" && (
                   <button
                     type="button"
@@ -648,7 +696,7 @@ export default function AuthPage() {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Min 6 characters"
+                  placeholder={existingUserFound?.exists && (isEstateMode || isSupplierMode) ? "Enter your existing password" : "Min 6 characters"}
                   className="pl-10 pr-10 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent"
                   required
                   minLength={6}

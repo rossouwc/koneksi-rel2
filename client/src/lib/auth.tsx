@@ -10,6 +10,7 @@ interface SupplierRegistrationData {
   services: string[];
   phone: string;
   contactEmail?: string;
+  existingUser?: boolean;
 }
 
 interface EstateRegistrationData {
@@ -19,6 +20,7 @@ interface EstateRegistrationData {
   estateSuburb?: string;
   estateCity?: string;
   estateProvince?: string;
+  existingUser?: boolean;
 }
 
 type ExtraRegistrationData = SupplierRegistrationData | EstateRegistrationData;

@@ -132,11 +132,26 @@ export async function registerRoutes(
     return { approved: true };
   }
 
+  app.post("/api/auth/check-email", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email required" });
+      const existing = await storage.getUserByEmail(email);
+      res.json({ exists: !!existing, fullName: existing ? (existing.fullName || "").split(" ")[0] + " ****" : null });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { email, password, fullName, registerAs, businessName, businessWebsite, services, phone, contactEmail, estateName, estateStreetName, estateSuburb, estateCity, estateProvince } = req.body;
-      if (!email || !password || !fullName) {
+      if (!email || !password) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      if (!fullName && !(registerAs === "supplier" || registerAs === "estate_admin")) {
+        return res.status(400).json({ message: "Full name is required" });
       }
 
       if (registerAs === "supplier") {
@@ -155,7 +170,59 @@ export async function registerRoutes(
       }
 
       const existing = await storage.getUserByEmail(email);
-      if (existing) {
+
+      if (existing && (registerAs === "supplier" || registerAs === "estate_admin")) {
+        const valid = await comparePasswords(password, existing.password);
+        if (!valid) {
+          return res.status(401).json({ message: "Incorrect password. Please enter the password for your existing account." });
+        }
+
+        if (registerAs === "supplier") {
+          const [updated] = await db.update(users).set({
+            role: "supplier" as const,
+            businessName,
+            businessWebsite: businessWebsite || null,
+            services,
+            phone,
+            approvalStatus: "pending",
+            profileComplete: true,
+          }).where(eq(users.id, existing.id)).returning();
+
+          req.session.userId = updated.id;
+          return res.json({ ...updated, password: undefined });
+        }
+
+        if (registerAs === "estate_admin") {
+          const result = await db.transaction(async (tx) => {
+            const [updated] = await tx.update(users).set({
+              role: "estate_admin" as const,
+              profileComplete: true,
+            }).where(eq(users.id, existing.id)).returning();
+
+            const inviteCode = (await import("crypto")).randomUUID().slice(0, 8).toUpperCase();
+            const [estate] = await tx.insert(estates).values({
+              name: estateName,
+              streetName: estateStreetName || null,
+              suburb: estateSuburb || null,
+              city: estateCity || null,
+              province: estateProvince || null,
+              inviteCode,
+            }).returning();
+
+            await tx.insert(userEstates).values({
+              userId: updated.id,
+              estateId: estate.id,
+              roleInEstate: "estate_admin" as const,
+            });
+
+            return updated;
+          });
+
+          req.session.userId = result.id;
+          return res.json({ ...result, password: undefined });
+        }
+
+      } else if (existing) {
         return res.status(400).json({ message: "Email already registered" });
       }
 
