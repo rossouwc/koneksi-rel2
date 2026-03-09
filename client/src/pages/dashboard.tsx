@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import type { Bill, Outage, Provider } from "@shared/schema";
+import { SavingsTracker } from "@/components/savings-tracker";
 
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -171,11 +172,19 @@ export default function Dashboard() {
         </Link>
       </motion.div>
 
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35, duration: 0.4 }}
+      >
+        <SavingsTracker />
+      </motion.div>
+
       <div className="grid md:grid-cols-2 gap-4 md:gap-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35, duration: 0.4 }}
+          transition={{ delay: 0.55, duration: 0.4 }}
         >
           <Card className="rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
@@ -241,7 +250,7 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.4 }}
+          transition={{ delay: 0.6, duration: 0.4 }}
         >
           <Card className="rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">

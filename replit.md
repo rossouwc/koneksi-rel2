@@ -59,6 +59,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - Submit animations (whileTap scale, spinning sparkles)
 - Google OAuth button (visual placeholder, shows "Coming Soon" toast)
 - Forgot password link (shows informational toast)
+- Savings Tracker: animated counter, Recharts area chart (6-month contiguous series), expandable bill history (capped at 20), personal/estate toggle, canvas-confetti on savings detected
 
 ## PWA
 - `client/public/manifest.json` - PWA manifest
