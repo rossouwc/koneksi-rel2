@@ -970,5 +970,49 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/pending-suppliers", requireAdmin, async (_req, res) => {
+    try {
+      const allUsersData = await storage.getAllUsers();
+      const pending = allUsersData
+        .filter((u) => u.role === "supplier" && u.approvalStatus === "pending")
+        .map((u) => ({ ...u, password: undefined }));
+      res.json(pending);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/admin/suppliers/:id/approve", requireAdmin, async (req, res) => {
+    try {
+      const supplier = await storage.getUser(req.params.id);
+      if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+      if (supplier.role !== "supplier") return res.status(400).json({ message: "User is not a supplier" });
+
+      if (supplier.approvalStatus !== "pending") {
+        return res.status(409).json({ message: `Supplier is already ${supplier.approvalStatus}` });
+      }
+      await db.update(users).set({ approvalStatus: "approved" }).where(eq(users.id, supplier.id));
+      res.json({ message: "Supplier approved" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/admin/suppliers/:id/reject", requireAdmin, async (req, res) => {
+    try {
+      const supplier = await storage.getUser(req.params.id);
+      if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+      if (supplier.role !== "supplier") return res.status(400).json({ message: "User is not a supplier" });
+
+      if (supplier.approvalStatus !== "pending") {
+        return res.status(409).json({ message: `Supplier is already ${supplier.approvalStatus}` });
+      }
+      await db.update(users).set({ approvalStatus: "rejected" }).where(eq(users.id, supplier.id));
+      res.json({ message: "Supplier rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   return httpServer;
 }

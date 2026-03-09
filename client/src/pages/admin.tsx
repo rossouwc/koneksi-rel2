@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
@@ -20,16 +20,30 @@ import {
   Copy,
   CheckCircle2,
   Search,
+  ClipboardCheck,
+  ExternalLink,
+  Phone,
+  Mail,
+  Globe,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  X,
+  Briefcase,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -354,6 +368,378 @@ function EstateDetail({ estateId, onBack }: { estateId: string; onBack: () => vo
   );
 }
 
+const serviceBadgeColors = [
+  "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20",
+  "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
+  "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
+  "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
+  "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+];
+
+function getServiceColor(service: string) {
+  let hash = 0;
+  for (let i = 0; i < service.length; i++) {
+    hash = service.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return serviceBadgeColors[Math.abs(hash) % serviceBadgeColors.length];
+}
+
+function PendingSuppliers() {
+  const { toast } = useToast();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; action: "approve" | "reject" } | null>(null);
+
+  const { data: pendingSuppliers = [], isLoading, isError, refetch } = useQuery<User[]>({
+    queryKey: ["/api/admin/pending-suppliers"],
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/admin/suppliers/${id}/approve`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setConfirmAction(null);
+      toast({ title: "Supplier approved", description: "They can now access the supplier portal" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/admin/suppliers/${id}/reject`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setConfirmAction(null);
+      toast({ title: "Supplier rejected" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="glass-card rounded-xl p-12 text-center">
+        <X className="w-12 h-12 mx-auto text-red-400/50 mb-3" />
+        <h3 className="font-semibold mb-1">Failed to load pending suppliers</h3>
+        <p className="text-sm text-muted-foreground mb-3">Something went wrong while fetching the data</p>
+        <Button variant="outline" className="rounded-xl" onClick={() => refetch()} data-testid="button-retry-pending">
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  if (pendingSuppliers.length === 0) {
+    return (
+      <div className="glass-card rounded-xl p-12 text-center">
+        <ClipboardCheck className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+        <h3 className="font-semibold mb-1">No pending approvals</h3>
+        <p className="text-sm text-muted-foreground">All supplier applications have been reviewed</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="glass-card rounded-xl overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-border/40">
+              <TableHead className="text-xs uppercase tracking-wider">Business</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider hidden md:table-cell">Services</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider hidden lg:table-cell">Website</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider hidden md:table-cell">Phone</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider hidden lg:table-cell">Email</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider hidden md:table-cell">Submitted</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pendingSuppliers.map((supplier) => {
+              const isExpanded = expandedId === supplier.id;
+              return (
+                <motion.tr
+                  key={supplier.id}
+                  className="border-border/30 cursor-pointer hover:bg-accent/50 transition-colors"
+                  data-testid={`pending-supplier-row-${supplier.id}`}
+                  onClick={() => setExpandedId(isExpanded ? null : supplier.id)}
+                  layout
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-lg gradient-teal flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        <Briefcase className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate" data-testid={`text-supplier-business-${supplier.id}`}>
+                          {supplier.businessName || supplier.fullName}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground truncate md:hidden">{supplier.email}</p>
+                        {supplier.services && supplier.services.length > 0 && (
+                          <div className="flex items-center gap-1 mt-1 md:hidden flex-wrap">
+                            {supplier.services.slice(0, 2).map((s) => (
+                              <Badge key={s} variant="outline" className={`text-[8px] px-1 py-0 rounded-full border ${getServiceColor(s)}`}>{s}</Badge>
+                            ))}
+                            {supplier.services.length > 2 && (
+                              <span className="text-[8px] text-muted-foreground">+{supplier.services.length - 2}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="ml-auto md:hidden text-muted-foreground"
+                        onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : supplier.id); }}
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {supplier.services && supplier.services.length > 0 ? (
+                      <div className="flex items-center gap-1 flex-wrap max-w-[200px]">
+                        {supplier.services.slice(0, 3).map((s) => (
+                          <Badge key={s} variant="outline" className={`text-[9px] px-1.5 py-0 rounded-full border ${getServiceColor(s)}`}>{s}</Badge>
+                        ))}
+                        {supplier.services.length > 3 && (
+                          <span className="text-[9px] text-muted-foreground">+{supplier.services.length - 3}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {supplier.businessWebsite ? (
+                      <a
+                        href={supplier.businessWebsite}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-primary hover:underline flex items-center gap-1"
+                        data-testid={`link-supplier-website-${supplier.id}`}
+                      >
+                        <Globe className="w-3 h-3" />
+                        {supplier.businessWebsite.replace(/^https?:\/\//, "").slice(0, 25)}
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <span className="text-xs text-muted-foreground">{supplier.phone || "—"}</span>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <span className="text-xs text-muted-foreground">{supplier.email}</span>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {supplier.createdAt ? new Date(supplier.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        className="rounded-lg h-7 text-[10px] gap-1 px-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => setConfirmAction({ id: supplier.id, name: supplier.businessName || supplier.fullName || "Supplier", action: "approve" })}
+                        data-testid={`button-approve-${supplier.id}`}
+                      >
+                        <Check className="w-3 h-3" />
+                        Approve
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-lg h-7 text-[10px] gap-1 px-2 text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
+                        onClick={() => setConfirmAction({ id: supplier.id, name: supplier.businessName || supplier.fullName || "Supplier", action: "reject" })}
+                        data-testid={`button-reject-${supplier.id}`}
+                      >
+                        <X className="w-3 h-3" />
+                        Reject
+                      </Button>
+                    </div>
+                  </TableCell>
+                </motion.tr>
+              );
+            })}
+          </TableBody>
+        </Table>
+
+        <AnimatePresence>
+          {expandedId && (() => {
+            const supplier = pendingSuppliers.find((s) => s.id === expandedId);
+            if (!supplier) return null;
+            return (
+              <motion.div
+                key={expandedId}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="border-t border-border/30 overflow-hidden"
+                data-testid={`supplier-detail-${supplier.id}`}
+              >
+                <div className="p-5 space-y-4 bg-muted/20">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-xl gradient-teal flex items-center justify-center text-white">
+                      <Briefcase className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg" data-testid={`text-detail-business-${supplier.id}`}>
+                        {supplier.businessName || supplier.fullName}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">{supplier.fullName}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <span>{supplier.email}</span>
+                    </div>
+                    {supplier.phone && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <span>{supplier.phone}</span>
+                      </div>
+                    )}
+                    {supplier.businessWebsite && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Globe className="w-4 h-4 text-muted-foreground" />
+                        <a
+                          href={supplier.businessWebsite}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline flex items-center gap-1"
+                          data-testid={`link-detail-website-${supplier.id}`}
+                        >
+                          {supplier.businessWebsite.replace(/^https?:\/\//, "")}
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                    {supplier.createdAt && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                        <span>Submitted {new Date(supplier.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {supplier.services && supplier.services.length > 0 && (
+                    <div data-testid={`container-detail-services-${supplier.id}`}>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Services</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {supplier.services.map((s) => (
+                          <Badge
+                            key={s}
+                            variant="outline"
+                            className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${getServiceColor(s)}`}
+                            data-testid={`badge-detail-service-${s.toLowerCase().replace(/\s+/g, "-")}`}
+                          >
+                            {s}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      className="rounded-xl gradient-teal text-white gap-1.5"
+                      onClick={() => setConfirmAction({ id: supplier.id, name: supplier.businessName || supplier.fullName || "Supplier", action: "approve" })}
+                      data-testid={`button-detail-approve-${supplier.id}`}
+                    >
+                      <Check className="w-4 h-4" />
+                      Approve Supplier
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-xl gap-1.5 text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
+                      onClick={() => setConfirmAction({ id: supplier.id, name: supplier.businessName || supplier.fullName || "Supplier", action: "reject" })}
+                      data-testid={`button-detail-reject-${supplier.id}`}
+                    >
+                      <X className="w-4 h-4" />
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })()}
+        </AnimatePresence>
+      </div>
+
+      <Dialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
+        <DialogContent className="rounded-2xl glass-card border-border/50 max-w-sm" data-testid="dialog-confirm-action">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {confirmAction?.action === "approve" ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <X className="w-5 h-5 text-red-500" />
+              )}
+              {confirmAction?.action === "approve" ? "Approve Supplier" : "Reject Supplier"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmAction?.action === "approve"
+                ? `Are you sure you want to approve "${confirmAction?.name}"? They will be able to access the supplier portal and claim a free estate listing.`
+                : `Are you sure you want to reject "${confirmAction?.name}"? They will not be able to access the supplier portal.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setConfirmAction(null)}
+              data-testid="button-cancel-confirm"
+            >
+              Cancel
+            </Button>
+            {confirmAction?.action === "approve" ? (
+              <Button
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={approveMutation.isPending}
+                onClick={() => confirmAction && approveMutation.mutate(confirmAction.id)}
+                data-testid="button-confirm-approve"
+              >
+                {approveMutation.isPending ? "Approving..." : "Yes, Approve"}
+              </Button>
+            ) : (
+              <Button
+                className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
+                disabled={rejectMutation.isPending}
+                onClick={() => confirmAction && rejectMutation.mutate(confirmAction.id)}
+                data-testid="button-confirm-reject"
+              >
+                {rejectMutation.isPending ? "Rejecting..." : "Yes, Reject"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -372,6 +758,11 @@ export default function AdminPage() {
 
   const { data: estatesWithStats = [], isLoading: estatesLoading } = useQuery<EstateWithStats[]>({
     queryKey: ["/api/admin/estates-with-stats"],
+    enabled: !!isAdmin,
+  });
+
+  const { data: pendingCount = [] } = useQuery<User[]>({
+    queryKey: ["/api/admin/pending-suppliers"],
     enabled: !!isAdmin,
   });
 
@@ -412,8 +803,8 @@ export default function AdminPage() {
         {[
           { label: "Total Users", value: allUsers.length, icon: Users, color: "bg-teal-600" },
           { label: "Estates", value: estatesWithStats.length, icon: Building2, color: "bg-emerald-500" },
-          { label: "Residents", value: estatesWithStats.reduce((s, e) => s + e.residentCount, 0), icon: Users, color: "bg-blue-500" },
-          { label: "Providers", value: estatesWithStats.reduce((s, e) => s + e.providerCount, 0), icon: Store, color: "bg-amber-500" },
+          { label: "Providers", value: estatesWithStats.reduce((s, e) => s + e.providerCount, 0), icon: Store, color: "bg-blue-500" },
+          { label: "Pending", value: pendingCount.length, icon: ClipboardCheck, color: "bg-amber-500" },
         ].map((stat, i) => (
           <motion.div
             key={stat.label}
@@ -443,6 +834,10 @@ export default function AdminPage() {
           <TabsTrigger value="users" data-testid="tab-users" className="rounded-lg">
             <Users className="w-4 h-4 mr-2" />
             Users
+          </TabsTrigger>
+          <TabsTrigger value="approvals" data-testid="tab-approvals" className="rounded-lg">
+            <ClipboardCheck className="w-4 h-4 mr-2" />
+            Approvals
           </TabsTrigger>
         </TabsList>
 
@@ -607,6 +1002,17 @@ export default function AdminPage() {
               </Table>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="approvals" className="mt-4 space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2 mb-1">
+              <ClipboardCheck className="w-5 h-5 text-primary" />
+              Pending Supplier Approvals
+            </h2>
+            <p className="text-sm text-muted-foreground">Review and approve or reject supplier applications</p>
+          </div>
+          <PendingSuppliers />
         </TabsContent>
       </Tabs>
 
