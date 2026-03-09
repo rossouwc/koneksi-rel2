@@ -20,6 +20,7 @@ import BillAnalyzerPage from "@/pages/bill-analyzer";
 import SupplierPortalPage from "@/pages/supplier-portal";
 import MarketplacePage from "@/pages/marketplace";
 import JoinEstatePage from "@/pages/join-estate";
+import PendingApprovalPage from "@/pages/pending-approval";
 import NotFound from "@/pages/not-found";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -39,6 +40,10 @@ function AppContent() {
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  if (user.role === "supplier" && user.approvalStatus === "pending") {
+    return <PendingApprovalPage />;
   }
 
   if (!user.profileComplete) {

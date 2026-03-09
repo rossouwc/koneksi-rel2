@@ -19,6 +19,10 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").default("resident"),
   profileComplete: boolean("profile_complete").default(false),
   isSuperAdmin: boolean("is_super_admin").default(false),
+  businessName: text("business_name"),
+  businessWebsite: text("business_website"),
+  services: text("services").array(),
+  approvalStatus: text("approval_status"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -120,7 +124,7 @@ export const providerVisibleEstates = pgTable("provider_visible_estates", {
   estateId: varchar("estate_id").notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, isSuperAdmin: true, profileComplete: true, role: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, isSuperAdmin: true, profileComplete: true, role: true, approvalStatus: true });
 export const insertEstateSchema = createInsertSchema(estates).omit({ id: true, createdAt: true, inviteCode: true });
 export const insertUserEstateSchema = createInsertSchema(userEstates).omit({ id: true, joinedAt: true });
 export const insertBillSchema = createInsertSchema(bills).omit({ id: true, createdAt: true });
@@ -140,7 +144,21 @@ export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   fullName: z.string().min(2),
-});
+  registerAs: z.enum(["resident", "supplier"]).default("resident"),
+  businessName: z.string().min(2).optional(),
+  businessWebsite: z.string().url().optional().or(z.literal("")),
+  services: z.array(z.string()).optional(),
+  phone: z.string().min(6).optional(),
+  contactEmail: z.string().email().optional().or(z.literal("")),
+}).refine(
+  (data) => {
+    if (data.registerAs === "supplier") {
+      return !!data.businessName && data.services && data.services.length > 0;
+    }
+    return true;
+  },
+  { message: "Business name and at least one service are required for suppliers" }
+);
 
 export const profileSetupSchema = z.object({
   phone: z.string().optional(),

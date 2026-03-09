@@ -11,6 +11,9 @@ import path from "path";
 import fs from "fs";
 import { analyzeBillImage } from "./openai-bill-analyzer";
 import { buildPayFastUrl, validatePayFastITN } from "./payfast";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const uploadsDir = path.resolve("uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -114,9 +117,18 @@ export async function registerRoutes(
 
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, password, fullName } = req.body;
+      const { email, password, fullName, registerAs, businessName, businessWebsite, services, phone, contactEmail } = req.body;
       if (!email || !password || !fullName) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      if (registerAs === "supplier") {
+        if (!businessName || !services || services.length === 0) {
+          return res.status(400).json({ message: "Business name and at least one service are required for suppliers" });
+        }
+        if (!phone) {
+          return res.status(400).json({ message: "Phone number is required for suppliers" });
+        }
       }
 
       const existing = await storage.getUserByEmail(email);
@@ -125,7 +137,34 @@ export async function registerRoutes(
       }
 
       const hashedPassword = await hashPassword(password);
-      const user = await storage.createUser({ email, password: hashedPassword, fullName });
+      const isSupplier = registerAs === "supplier";
+
+      const userData: any = {
+        email,
+        password: hashedPassword,
+        fullName: isSupplier ? businessName : fullName,
+        phone: isSupplier ? phone : undefined,
+      };
+
+      if (isSupplier) {
+        userData.businessName = businessName;
+        userData.businessWebsite = businessWebsite || null;
+        userData.services = services;
+      }
+
+      let user;
+      if (isSupplier) {
+        const [created] = await db.insert(users).values({
+          ...userData,
+          role: "supplier" as const,
+          approvalStatus: "pending",
+          profileComplete: true,
+        }).returning();
+        user = created;
+      } else {
+        user = await storage.createUser(userData);
+      }
+
       req.session.userId = user.id;
       res.json({ ...user, password: undefined });
     } catch (err: any) {
@@ -498,6 +537,12 @@ export async function registerRoutes(
     const user = await storage.getUser(req.session.userId);
     if (user?.role !== "supplier") {
       return res.status(403).json({ message: "Supplier access required" });
+    }
+    if (user.approvalStatus === "pending") {
+      return res.status(403).json({ message: "Your supplier account is pending approval" });
+    }
+    if (user.approvalStatus === "rejected") {
+      return res.status(403).json({ message: "Your supplier account has been rejected" });
     }
     next();
   }

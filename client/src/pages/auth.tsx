@@ -4,20 +4,64 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff, Briefcase, Phone, Globe, X, ChevronDown } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 
+const SERVICE_OPTIONS = [
+  "Plumbing",
+  "Electrical",
+  "Pool Maintenance",
+  "Solar Installation",
+  "Gardening",
+  "Pest Control",
+  "Painting",
+  "General Maintenance",
+  "Leak Detection",
+  "Water Purification",
+];
+
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [registerType, setRegisterType] = useState<"resident" | "supplier">("resident");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [businessName, setBusinessName] = useState("");
+  const [businessWebsite, setBusinessWebsite] = useState("");
+  const [services, setServices] = useState<string[]>([]);
+  const [phone, setPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [customService, setCustomService] = useState("");
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+
   const { login, register } = useAuth();
   const { toast } = useToast();
+
+  const toggleService = (service: string) => {
+    setServices((prev) =>
+      prev.includes(service)
+        ? prev.filter((s) => s !== service)
+        : [...prev, service]
+    );
+  };
+
+  const addCustomService = () => {
+    const trimmed = customService.trim();
+    if (trimmed && !services.includes(trimmed)) {
+      setServices((prev) => [...prev, trimmed]);
+      setCustomService("");
+    }
+  };
+
+  const removeService = (service: string) => {
+    setServices((prev) => prev.filter((s) => s !== service));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +69,28 @@ export default function AuthPage() {
     try {
       if (mode === "login") {
         await login(email, password);
+      } else if (registerType === "supplier") {
+        if (!businessName.trim()) {
+          throw new Error("Business name is required");
+        }
+        if (services.length === 0) {
+          throw new Error("Please select at least one service");
+        }
+        if (!phone.trim()) {
+          throw new Error("Phone number is required");
+        }
+        await register(email, password, fullName || businessName, {
+          registerAs: "supplier",
+          businessName: businessName.trim(),
+          businessWebsite: businessWebsite.trim() || undefined,
+          services,
+          phone: phone.trim(),
+          contactEmail: contactEmail.trim() || undefined,
+        });
+        toast({
+          title: "Account Submitted",
+          description: "We'll review and notify you soon.",
+        });
       } else {
         await register(email, password, fullName);
       }
@@ -46,6 +112,10 @@ export default function AuthPage() {
     });
   };
 
+  const isSupplierMode = mode === "register" && registerType === "supplier";
+
+  const inputClass = "pl-10 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent";
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 gradient-teal opacity-90" />
@@ -59,7 +129,7 @@ export default function AuthPage() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        className="relative z-10 w-full max-w-md px-6"
+        className="relative z-10 w-full max-w-md px-6 max-h-[90vh] overflow-y-auto"
       >
         <div className="text-center mb-8">
           <motion.img
@@ -109,6 +179,49 @@ export default function AuthPage() {
             ))}
           </div>
 
+          <AnimatePresence mode="wait">
+            {mode === "register" && (
+              <motion.div
+                key="register-type"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="mb-5"
+              >
+                <Label className="text-white/90 text-sm mb-2 block">Register as</Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    data-testid="button-register-resident"
+                    onClick={() => setRegisterType("resident")}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      registerType === "resident"
+                        ? "bg-white/20 text-white border border-white/30"
+                        : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                    Resident
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="button-register-supplier"
+                    onClick={() => setRegisterType("supplier")}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      registerType === "supplier"
+                        ? "bg-white/20 text-white border border-white/30"
+                        : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
+                    }`}
+                  >
+                    <Briefcase className="w-4 h-4" />
+                    Supplier
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <button
             onClick={handleGoogleAuth}
             data-testid="button-google-auth"
@@ -126,7 +239,7 @@ export default function AuthPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <AnimatePresence mode="wait">
-              {mode === "register" && (
+              {mode === "register" && !isSupplierMode && (
                 <motion.div
                   key="name-field"
                   initial={{ opacity: 0, height: 0 }}
@@ -142,9 +255,190 @@ export default function AuthPage() {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       placeholder="Your full name"
-                      className="pl-10 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent"
-                      required={mode === "register"}
+                      className={inputClass}
+                      required={mode === "register" && !isSupplierMode}
                     />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence mode="wait">
+              {isSupplierMode && (
+                <motion.div
+                  key="supplier-fields"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <Label className="text-white/90 text-sm mb-1.5 block">
+                      Business Name <span className="text-red-400">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <Input
+                        data-testid="input-business-name"
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                        placeholder="Your business name"
+                        className={inputClass}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-white/90 text-sm mb-1.5 block">Website</Label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <Input
+                        data-testid="input-business-website"
+                        value={businessWebsite}
+                        onChange={(e) => setBusinessWebsite(e.target.value)}
+                        placeholder="https://yourbusiness.co.za"
+                        className={inputClass}
+                        type="url"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-white/90 text-sm mb-1.5 block">
+                      Services <span className="text-red-400">*</span>
+                    </Label>
+
+                    {services.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {services.map((service) => (
+                          <Badge
+                            key={service}
+                            data-testid={`badge-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
+                            className="bg-teal-500/30 text-white border-teal-400/30 hover:bg-teal-500/40 cursor-pointer gap-1 py-1 px-2"
+                            onClick={() => removeService(service)}
+                          >
+                            {service}
+                            <X className="w-3 h-3" />
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="relative">
+                      <button
+                        type="button"
+                        data-testid="button-services-dropdown"
+                        onClick={() => setShowServiceDropdown(!showServiceDropdown)}
+                        className="w-full flex items-center justify-between py-2.5 px-3 bg-white/10 border border-white/15 text-white/60 rounded-xl text-sm hover:bg-white/15 transition-all"
+                      >
+                        <span>{services.length === 0 ? "Select services..." : `${services.length} selected`}</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform ${showServiceDropdown ? "rotate-180" : ""}`} />
+                      </button>
+
+                      <AnimatePresence>
+                        {showServiceDropdown && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute z-50 w-full mt-1 rounded-xl overflow-hidden max-h-48 overflow-y-auto"
+                            style={{
+                              background: "rgba(30, 60, 55, 0.95)",
+                              backdropFilter: "blur(16px)",
+                              border: "1px solid rgba(255, 255, 255, 0.15)",
+                            }}
+                          >
+                            {SERVICE_OPTIONS.map((service) => (
+                              <button
+                                key={service}
+                                type="button"
+                                data-testid={`option-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
+                                onClick={() => toggleService(service)}
+                                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                                  services.includes(service)
+                                    ? "bg-teal-500/30 text-white"
+                                    : "text-white/70 hover:bg-white/10"
+                                }`}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${
+                                    services.includes(service)
+                                      ? "bg-teal-500 border-teal-400 text-white"
+                                      : "border-white/30"
+                                  }`}>
+                                    {services.includes(service) && "✓"}
+                                  </span>
+                                  {service}
+                                </span>
+                              </button>
+                            ))}
+
+                            <div className="p-2 border-t border-white/10">
+                              <div className="flex gap-1.5">
+                                <Input
+                                  data-testid="input-custom-service"
+                                  value={customService}
+                                  onChange={(e) => setCustomService(e.target.value)}
+                                  placeholder="Other service..."
+                                  className="flex-1 h-8 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-lg text-xs"
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      addCustomService();
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  type="button"
+                                  data-testid="button-add-custom-service"
+                                  onClick={addCustomService}
+                                  size="sm"
+                                  className="h-8 px-3 bg-teal-600 hover:bg-teal-500 rounded-lg text-xs"
+                                >
+                                  Add
+                                </Button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-white/90 text-sm mb-1.5 block">
+                      Phone <span className="text-red-400">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <Input
+                        data-testid="input-phone"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="082 123 4567"
+                        className={inputClass}
+                        type="tel"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-white/90 text-sm mb-1.5 block">Contact Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <Input
+                        data-testid="input-contact-email"
+                        value={contactEmail}
+                        onChange={(e) => setContactEmail(e.target.value)}
+                        placeholder={email || "Defaults to signup email"}
+                        className={inputClass}
+                        type="email"
+                      />
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -160,7 +454,7 @@ export default function AuthPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="pl-10 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent"
+                  className={inputClass}
                   required
                 />
               </div>
@@ -213,7 +507,11 @@ export default function AuthPage() {
                 data-testid="button-auth-submit"
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full rounded-xl bg-white text-teal-700 font-semibold py-6 text-base hover:bg-white/90 transition-all duration-200"
+                className={`w-full rounded-xl font-semibold py-6 text-base transition-all duration-200 ${
+                  isSupplierMode
+                    ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white hover:from-teal-400 hover:to-emerald-400"
+                    : "bg-white text-teal-700 hover:bg-white/90"
+                }`}
               >
                 {isSubmitting ? (
                   <motion.div
@@ -224,7 +522,11 @@ export default function AuthPage() {
                   </motion.div>
                 ) : (
                   <span className="flex items-center gap-2">
-                    {mode === "login" ? "Sign In" : "Create Account"}
+                    {mode === "login"
+                      ? "Sign In"
+                      : isSupplierMode
+                        ? "Submit for Approval"
+                        : "Create Account"}
                     <ArrowRight className="w-4 h-4" />
                   </span>
                 )}
