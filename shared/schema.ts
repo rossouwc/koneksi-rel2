@@ -43,6 +43,7 @@ export const userEstates = pgTable("user_estates", {
   userId: varchar("user_id").notNull(),
   estateId: varchar("estate_id").notNull(),
   roleInEstate: estateRoleEnum("role_in_estate").notNull().default("resident"),
+  approvalStatus: text("approval_status").default("pending"),
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 

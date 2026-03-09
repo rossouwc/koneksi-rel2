@@ -149,7 +149,7 @@ function CreateEstateDialog() {
 
 export default function JoinEstatePage() {
   const { user } = useAuth();
-  const { setCurrentEstate, estates } = useEstate();
+  const { setCurrentEstate, approvedEstates, pendingEstates } = useEstate();
   const joinEstate = useJoinEstate();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -161,12 +161,11 @@ export default function JoinEstatePage() {
     e.preventDefault();
     try {
       const estate = await joinEstate.mutateAsync(inviteCode.trim().toUpperCase());
-      setCurrentEstate(estate);
+      queryClient.invalidateQueries({ queryKey: ["/api/estates"] });
       toast({
-        title: "Joined Successfully",
-        description: `Welcome to ${estate.name}!`,
+        title: "Request Submitted",
+        description: `Your request to join ${estate.name} has been sent to the estate admin for approval.`,
       });
-      setLocation("/");
     } catch (err: any) {
       toast({
         title: "Failed to Join",
@@ -245,7 +244,7 @@ export default function JoinEstatePage() {
         </form>
       </motion.div>
 
-      {estates.length > 0 && (
+      {approvedEstates.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -253,7 +252,7 @@ export default function JoinEstatePage() {
         >
           <h2 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Your Estates</h2>
           <div className="space-y-2">
-            {estates.map((estate) => (
+            {approvedEstates.map((estate) => (
               <button
                 key={estate.id}
                 data-testid={`estate-link-${estate.id}`}
@@ -275,6 +274,33 @@ export default function JoinEstatePage() {
                 </div>
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
               </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {pendingEstates.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.4 }}
+        >
+          <h2 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Pending Approval</h2>
+          <div className="space-y-2">
+            {pendingEstates.map((estate) => (
+              <div
+                key={estate.id}
+                data-testid={`estate-pending-${estate.id}`}
+                className="w-full glass-card rounded-xl p-4 flex items-center gap-3 opacity-70"
+              >
+                <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-4 h-4 text-amber-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm truncate">{estate.name}</p>
+                  <p className="text-xs text-amber-500 mt-0.5">Awaiting estate admin approval</p>
+                </div>
+              </div>
             ))}
           </div>
         </motion.div>

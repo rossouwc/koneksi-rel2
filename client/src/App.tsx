@@ -51,7 +51,7 @@ function SupplierApp() {
 
 function ResidentAppInner() {
   const { user } = useAuth();
-  const { estates, isLoading: estatesLoading } = useEstate();
+  const { estates, approvedEstates, isLoading: estatesLoading } = useEstate();
 
   if (estatesLoading) {
     return (
@@ -64,7 +64,7 @@ function ResidentAppInner() {
     );
   }
 
-  const hasApprovedEstate = estates.some((e) => e.approvalStatus === "approved");
+  const hasApprovedEstate = estates.some((e) => e.approvalStatus === "approved" && e.memberApprovalStatus === "approved");
 
   if (user?.role === "estate_admin" && !hasApprovedEstate) {
     return <PendingEstateApprovalPage estates={estates} />;

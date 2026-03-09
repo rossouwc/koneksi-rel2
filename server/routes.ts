@@ -120,7 +120,7 @@ export async function registerRoutes(
 
   async function verifyEstateMembership(userId: string, estateId: string): Promise<boolean> {
     const link = await storage.getUserEstateLink(userId, estateId);
-    return !!link;
+    return !!link && link.approvalStatus === "approved";
   }
 
   async function requireApprovedEstate(estateId: string): Promise<{ approved: boolean; message?: string }> {
@@ -213,6 +213,7 @@ export async function registerRoutes(
               userId: updated.id,
               estateId: estate.id,
               roleInEstate: "estate_admin" as const,
+              approvalStatus: "approved",
             });
 
             return updated;
@@ -270,6 +271,7 @@ export async function registerRoutes(
             userId: user.id,
             estateId: estate.id,
             roleInEstate: "estate_admin" as const,
+            approvalStatus: "approved",
           });
 
           return user;
@@ -371,6 +373,75 @@ export async function registerRoutes(
       }
       await storage.addUserToEstate({ userId: req.session.userId!, estateId: estate.id, roleInEstate: "resident" });
       res.json(estate);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/estates/:id/pending-residents", requireAuth, async (req, res) => {
+    try {
+      const estateId = req.params.id;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can view pending residents" });
+      }
+      const allLinks = await db.select().from(userEstates).where(eq(userEstates.estateId, estateId));
+      const pending = allLinks.filter((l) => l.approvalStatus === "pending");
+      const result = [];
+      for (const p of pending) {
+        const u = await storage.getUser(p.userId);
+        if (u) result.push({ userId: u.id, fullName: u.fullName, email: u.email, joinedAt: p.joinedAt });
+      }
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/estates/:id/residents", requireAuth, async (req, res) => {
+    try {
+      const estateId = req.params.id;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can view residents" });
+      }
+      const residents = await storage.getEstateResidents(estateId);
+      const allLinks = await db.select().from(userEstates).where(eq(userEstates.estateId, estateId));
+      const result = residents.map((r) => {
+        const memberLink = allLinks.find((l) => l.userId === r.user.id);
+        return { ...r, approvalStatus: memberLink?.approvalStatus || "approved" };
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/estates/:id/residents/:userId/approve", requireAuth, async (req, res) => {
+    try {
+      const { id: estateId, userId } = req.params;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can approve residents" });
+      }
+      await db.update(userEstates).set({ approvalStatus: "approved" })
+        .where(sql`${userEstates.userId} = ${userId} AND ${userEstates.estateId} = ${estateId}`);
+      res.json({ message: "Resident approved" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/estates/:id/residents/:userId/reject", requireAuth, async (req, res) => {
+    try {
+      const { id: estateId, userId } = req.params;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can reject residents" });
+      }
+      await db.delete(userEstates)
+        .where(sql`${userEstates.userId} = ${userId} AND ${userEstates.estateId} = ${estateId}`);
+      res.json({ message: "Resident rejected" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -24,6 +24,8 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `client/src/lib/theme.tsx` - Dark/light theme provider with system preference detection
 - `client/src/lib/estate-context.tsx` - Multi-tenant estate context with localStorage persistence
   - Exports: `useEstate`, `useCurrentEstate`, `useEstatesList`, `useJoinEstate`
+  - Context exposes: `approvedEstates`, `pendingEstates`, `currentEstateRole`, `isEstateAdmin`
+  - Dashboard shows "Pending Residents" section for estate admins with approve/reject buttons
 - `client/src/hooks/use-user-profile.ts` - useUserProfile hook for profile data and mutations
 - `client/src/hooks/use-bill-analysis.ts` - useBillAnalysis hook (file upload → OpenAI analysis → save)
 - `client/src/hooks/use-subscription.ts` - useSubscription hook (tier subscribe/upgrade → PayFast redirect)
@@ -44,7 +46,10 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
   - role enum: resident, estate_admin, super_admin, supplier
   - approvalStatus: null (default for residents), "pending" (supplier awaiting review), "approved", "rejected"
 - **estates** - id, name, streetName, suburb, city, province, inviteCode (auto-generated 8-char uppercase), approvalStatus (pending/approved/rejected, default pending)
-- **user_estates** - junction table (userId, estateId, roleInEstate)
+- **user_estates** - junction table (userId, estateId, roleInEstate, approvalStatus)
+  - approvalStatus: "approved" (default for estate_admin creators), "pending" (default for residents joining via invite code)
+  - Estate admins must approve pending residents before they can access estate data
+  - `verifyEstateMembership` checks both link existence AND approvalStatus === "approved"
 - **bills** - userId, estateId, title, amount (cents), dueDate, category, status
 - **outages** - userId, estateId, type (electricity/water/internet/gas/other), title, description, status
 - **providers** - estateId, createdBy, name, category, phone, whatsapp, email, website, description

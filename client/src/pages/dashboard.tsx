@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useEstate } from "@/lib/estate-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Receipt,
   Zap,
@@ -16,10 +17,16 @@ import {
   Sparkles,
   ArrowRight,
   Copy,
+  Users,
+  UserCheck,
+  UserX,
+  Check,
+  X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import type { Bill, Outage, Provider } from "@shared/schema";
@@ -62,7 +69,7 @@ function StatCard({
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { currentEstate } = useEstate();
+  const { currentEstate, isEstateAdmin } = useEstate();
   const { toast } = useToast();
 
   const estateParam = currentEstate ? `?estateId=${currentEstate.id}` : "";
@@ -81,6 +88,37 @@ export default function Dashboard() {
 
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
     queryKey: [providersUrl],
+  });
+
+  const { data: pendingResidents = [] } = useQuery<{ userId: string; fullName: string; email: string; joinedAt: string }[]>({
+    queryKey: ["/api/estates", currentEstate?.id, "pending-residents"],
+    queryFn: async () => {
+      if (!currentEstate) return [];
+      const res = await fetch(`/api/estates/${currentEstate.id}/pending-residents`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentEstate && isEstateAdmin,
+  });
+
+  const approveResidentMutation = useMutation({
+    mutationFn: async ({ estateId, userId }: { estateId: string; userId: string }) => {
+      await apiRequest("PATCH", `/api/estates/${estateId}/residents/${userId}/approve`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estates", currentEstate?.id, "pending-residents"] });
+      toast({ title: "Resident approved", description: "They can now access estate data." });
+    },
+  });
+
+  const rejectResidentMutation = useMutation({
+    mutationFn: async ({ estateId, userId }: { estateId: string; userId: string }) => {
+      await apiRequest("PATCH", `/api/estates/${estateId}/residents/${userId}/reject`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estates", currentEstate?.id, "pending-residents"] });
+      toast({ title: "Resident rejected", description: "Their access request has been removed." });
+    },
   });
 
   const isLoading = billsLoading || outagesLoading || providersLoading;
@@ -108,7 +146,9 @@ export default function Dashboard() {
           {greeting()}, {user?.fullName?.split(" ")[0]}
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          {currentEstate ? `Managing ${currentEstate.name}` : "Your personal dashboard"}
+          {currentEstate
+            ? isEstateAdmin ? `Managing ${currentEstate.name}` : `Viewing ${currentEstate.name}`
+            : "Your personal dashboard"}
         </p>
       </motion.div>
 
@@ -131,20 +171,22 @@ export default function Dashboard() {
             <h2 className="text-xl md:text-2xl font-bold text-white" data-testid="text-estate-name">
               {currentEstate.name}
             </h2>
-            <p className="text-white/60 text-xs mt-2 flex items-center gap-1.5">
-              Invite code: <span className="font-mono bg-white/10 px-2 py-0.5 rounded">{currentEstate.inviteCode}</span>
-              <button
-                type="button"
-                data-testid="button-copy-invite-code"
-                onClick={() => {
-                  navigator.clipboard.writeText(currentEstate.inviteCode);
-                  toast({ title: "Copied!", description: "Invite code copied to clipboard." });
-                }}
-                className="text-white/50 hover:text-white transition-colors"
-              >
-                <Copy className="w-3.5 h-3.5" />
-              </button>
-            </p>
+            {isEstateAdmin && (
+              <p className="text-white/60 text-xs mt-2 flex items-center gap-1.5">
+                Invite code: <span className="font-mono bg-white/10 px-2 py-0.5 rounded">{currentEstate.inviteCode}</span>
+                <button
+                  type="button"
+                  data-testid="button-copy-invite-code"
+                  onClick={() => {
+                    navigator.clipboard.writeText(currentEstate.inviteCode);
+                    toast({ title: "Copied!", description: "Invite code copied to clipboard." });
+                  }}
+                  className="text-white/50 hover:text-white transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </p>
+            )}
           </div>
         </motion.div>
       )}
@@ -163,6 +205,68 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {isEstateAdmin && currentEstate && pendingResidents.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.31, duration: 0.4 }}
+          className="glass-card rounded-2xl p-5"
+          data-testid="section-pending-residents"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center">
+              <Users className="w-4.5 h-4.5 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm">Pending Residents</h3>
+              <p className="text-xs text-muted-foreground">{pendingResidents.length} awaiting approval</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {pendingResidents.map((r) => (
+              <div
+                key={r.userId}
+                className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/50"
+                data-testid={`pending-resident-${r.userId}`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full gradient-teal flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    {r.fullName?.[0]?.toUpperCase() || "U"}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{r.fullName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{r.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <Button
+                    size="sm"
+                    className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg"
+                    onClick={() => approveResidentMutation.mutate({ estateId: currentEstate.id, userId: r.userId })}
+                    disabled={approveResidentMutation.isPending}
+                    data-testid={`button-approve-resident-${r.userId}`}
+                  >
+                    <Check className="w-3.5 h-3.5 mr-1" />
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2.5 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 rounded-lg"
+                    onClick={() => rejectResidentMutation.mutate({ estateId: currentEstate.id, userId: r.userId })}
+                    disabled={rejectResidentMutation.isPending}
+                    data-testid={`button-reject-resident-${r.userId}`}
+                  >
+                    <X className="w-3.5 h-3.5 mr-1" />
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}

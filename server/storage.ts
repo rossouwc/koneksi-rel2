@@ -25,7 +25,7 @@ export interface IStorage {
 
   getEstate(id: string): Promise<Estate | undefined>;
   getEstateByInviteCode(code: string): Promise<Estate | undefined>;
-  getUserEstates(userId: string): Promise<Estate[]>;
+  getUserEstates(userId: string): Promise<(Estate & { roleInEstate: string; memberApprovalStatus: string | null })[]>;
   getUserEstateIds(userId: string): Promise<string[]>;
   getAllEstates(): Promise<Estate[]>;
   createEstate(estate: InsertEstate): Promise<Estate>;
@@ -98,21 +98,20 @@ export class DatabaseStorage implements IStorage {
     return estate;
   }
 
-  async getUserEstates(userId: string): Promise<Estate[]> {
+  async getUserEstates(userId: string): Promise<(Estate & { roleInEstate: string; memberApprovalStatus: string | null })[]> {
     const links = await db.select().from(userEstates).where(eq(userEstates.userId, userId));
     if (links.length === 0) return [];
-    const estateIds = links.map((l) => l.estateId);
-    const result: Estate[] = [];
-    for (const id of estateIds) {
-      const [estate] = await db.select().from(estates).where(eq(estates.id, id));
-      if (estate) result.push(estate);
+    const result: (Estate & { roleInEstate: string; memberApprovalStatus: string | null })[] = [];
+    for (const link of links) {
+      const [estate] = await db.select().from(estates).where(eq(estates.id, link.estateId));
+      if (estate) result.push({ ...estate, roleInEstate: link.roleInEstate, memberApprovalStatus: link.approvalStatus });
     }
     return result;
   }
 
   async getUserEstateIds(userId: string): Promise<string[]> {
-    const links = await db.select({ estateId: userEstates.estateId }).from(userEstates).where(eq(userEstates.userId, userId));
-    return links.map((l) => l.estateId);
+    const links = await db.select({ estateId: userEstates.estateId, approvalStatus: userEstates.approvalStatus }).from(userEstates).where(eq(userEstates.userId, userId));
+    return links.filter((l) => l.approvalStatus === "approved").map((l) => l.estateId);
   }
 
   async getAllEstates(): Promise<Estate[]> {

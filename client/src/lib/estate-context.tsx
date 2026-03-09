@@ -6,41 +6,50 @@ import { useAuth } from "./auth";
 
 const PERSONAL_KEY = "__personal__";
 
+type EstateWithMembership = Estate & { roleInEstate: string; memberApprovalStatus: string | null };
+
 interface EstateContextType {
-  currentEstate: Estate | null;
-  estates: Estate[];
-  setCurrentEstate: (estate: Estate | null) => void;
+  currentEstate: EstateWithMembership | null;
+  estates: EstateWithMembership[];
+  approvedEstates: EstateWithMembership[];
+  pendingEstates: EstateWithMembership[];
+  setCurrentEstate: (estate: EstateWithMembership | null) => void;
   isLoading: boolean;
   isPersonalMode: boolean;
+  currentEstateRole: string | null;
+  isEstateAdmin: boolean;
 }
 
 const EstateContext = createContext<EstateContextType | null>(null);
 
 export function EstateProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [currentEstate, setCurrentEstateState] = useState<Estate | null>(null);
+  const [currentEstate, setCurrentEstateState] = useState<EstateWithMembership | null>(null);
   const [initialized, setInitialized] = useState(false);
 
-  const { data: estates = [], isLoading } = useQuery<Estate[]>({
+  const { data: estates = [], isLoading } = useQuery<EstateWithMembership[]>({
     queryKey: ["/api/estates"],
     enabled: !!user,
   });
+
+  const approvedEstates = estates.filter((e) => e.memberApprovalStatus === "approved");
+  const pendingEstates = estates.filter((e) => e.memberApprovalStatus === "pending");
 
   useEffect(() => {
     if (isLoading || initialized) return;
     const savedId = localStorage.getItem("koneksi-estate");
     if (savedId === PERSONAL_KEY) {
       setCurrentEstateState(null);
-    } else if (estates.length > 0) {
-      const saved = estates.find((e) => e.id === savedId);
-      setCurrentEstateState(saved || estates[0]);
+    } else if (approvedEstates.length > 0) {
+      const saved = approvedEstates.find((e) => e.id === savedId);
+      setCurrentEstateState(saved || approvedEstates[0]);
     } else {
       setCurrentEstateState(null);
     }
     setInitialized(true);
   }, [estates, isLoading, initialized]);
 
-  const setCurrentEstate = (estate: Estate | null) => {
+  const setCurrentEstate = (estate: EstateWithMembership | null) => {
     setCurrentEstateState(estate);
     if (estate) {
       localStorage.setItem("koneksi-estate", estate.id);
@@ -50,9 +59,11 @@ export function EstateProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isPersonalMode = currentEstate === null;
+  const currentEstateRole = currentEstate?.roleInEstate || null;
+  const isEstateAdmin = currentEstateRole === "estate_admin";
 
   return (
-    <EstateContext.Provider value={{ currentEstate, estates, setCurrentEstate, isLoading, isPersonalMode }}>
+    <EstateContext.Provider value={{ currentEstate, estates, approvedEstates, pendingEstates, setCurrentEstate, isLoading, isPersonalMode, currentEstateRole, isEstateAdmin }}>
       {children}
     </EstateContext.Provider>
   );

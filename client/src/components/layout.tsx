@@ -129,7 +129,7 @@ function AvatarDropdown() {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
-  const { currentEstate, estates, setCurrentEstate } = useEstate();
+  const { currentEstate, approvedEstates, setCurrentEstate, pendingEstates } = useEstate();
   const { theme, toggleTheme } = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -211,7 +211,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   if (val === PERSONAL_VALUE) {
                     setCurrentEstate(null);
                   } else {
-                    const estate = estates.find((e) => e.id === val);
+                    const estate = approvedEstates.find((e) => e.id === val);
                     if (estate) setCurrentEstate(estate);
                   }
                 }}
@@ -229,7 +229,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       Personal
                     </span>
                   </SelectItem>
-                  {estates.map((e) => (
+                  {approvedEstates.map((e) => (
                     <SelectItem key={e.id} value={e.id} data-testid={`estate-option-${e.id}`}>
                       {e.name}
                     </SelectItem>
