@@ -577,6 +577,80 @@ export async function registerRoutes(
     next();
   }
 
+  app.get("/api/supplier/profile", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || user.role !== "supplier") {
+        return res.status(403).json({ message: "Supplier access required" });
+      }
+      res.json({
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        phone: user.phone,
+        businessName: user.businessName,
+        businessWebsite: user.businessWebsite,
+        services: user.services,
+        approvalStatus: user.approvalStatus,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/supplier/profile", requireSupplier, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { businessName, businessWebsite, services, phone } = req.body;
+
+      if (businessName !== undefined && (typeof businessName !== "string" || businessName.trim().length < 2)) {
+        return res.status(400).json({ message: "Business name must be at least 2 characters" });
+      }
+      if (services !== undefined) {
+        if (!Array.isArray(services) || services.length === 0 || !services.every((s: any) => typeof s === "string" && s.trim().length > 0)) {
+          return res.status(400).json({ message: "At least one valid service is required" });
+        }
+      }
+      if (phone !== undefined && typeof phone !== "string") {
+        return res.status(400).json({ message: "Invalid phone format" });
+      }
+
+      let normalizedWebsite: string | null = null;
+      if (businessWebsite !== undefined && businessWebsite) {
+        const ws = String(businessWebsite).trim();
+        if (ws && !/^https?:\/\//i.test(ws)) {
+          normalizedWebsite = `https://${ws}`;
+        } else {
+          normalizedWebsite = ws || null;
+        }
+        if (normalizedWebsite && !/^https?:\/\/.+/i.test(normalizedWebsite)) {
+          return res.status(400).json({ message: "Website must be a valid URL" });
+        }
+      }
+
+      const updates: any = {};
+      if (businessName !== undefined) { updates.businessName = businessName.trim(); updates.fullName = businessName.trim(); }
+      if (businessWebsite !== undefined) updates.businessWebsite = normalizedWebsite;
+      if (services !== undefined) updates.services = services.map((s: string) => s.trim());
+      if (phone !== undefined) updates.phone = phone.trim();
+
+      await db.update(users).set(updates).where(eq(users.id, userId));
+      const updated = await storage.getUser(userId);
+      res.json({
+        id: updated!.id,
+        email: updated!.email,
+        fullName: updated!.fullName,
+        phone: updated!.phone,
+        businessName: updated!.businessName,
+        businessWebsite: updated!.businessWebsite,
+        services: updated!.services,
+        approvalStatus: updated!.approvalStatus,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/supplier/dashboard", requireSupplier, async (req, res) => {
     try {
       const userId = req.session.userId!;

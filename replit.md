@@ -27,6 +27,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `client/src/hooks/use-user-profile.ts` - useUserProfile hook for profile data and mutations
 - `client/src/hooks/use-bill-analysis.ts` - useBillAnalysis hook (file upload → OpenAI analysis → save)
 - `client/src/hooks/use-subscription.ts` - useSubscription hook (tier subscribe/upgrade → PayFast redirect)
+- `client/src/hooks/use-supplier-profile.ts` - useSupplierProfile hook (GET/PATCH /api/supplier/profile, profile card + edit)
 
 ## Multi-Tenant Architecture
 - Estate selector in header with "Personal" option (no estate) + all user's estates
