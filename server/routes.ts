@@ -64,7 +64,7 @@ export async function registerRoutes(
       return res.status(401).json({ message: "Unauthorized" });
     }
     const user = await storage.getUser(req.session.userId);
-    if (!user?.isSuperAdmin) {
+    if (!user?.isSuperAdmin && user?.role !== "super_admin") {
       return res.status(403).json({ message: "Forbidden" });
     }
     next();
@@ -130,6 +130,21 @@ export async function registerRoutes(
       return res.status(401).json({ message: "User not found" });
     }
     res.json({ ...user, password: undefined });
+  });
+
+  app.patch("/api/auth/profile", requireAuth, async (req, res) => {
+    try {
+      const { fullName, phone, suburb } = req.body;
+      const updateData: any = {};
+      if (fullName) updateData.fullName = fullName;
+      if (phone !== undefined) updateData.phone = phone;
+      if (suburb !== undefined) updateData.suburb = suburb;
+      updateData.profileComplete = true;
+      const updated = await storage.updateUserProfile(req.session.userId!, updateData);
+      res.json({ ...updated, password: undefined });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   async function verifyEstateMembership(userId: string, estateId: string): Promise<boolean> {

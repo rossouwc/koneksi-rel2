@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { EstateProvider } from "@/lib/estate-context";
 import Layout from "@/components/layout";
 import AuthPage from "@/pages/auth";
+import ProfileSetupPage from "@/pages/profile-setup";
 import Dashboard from "@/pages/dashboard";
 import BillsPage from "@/pages/bills";
 import OutagesPage from "@/pages/outages";
@@ -32,6 +33,10 @@ function AppContent() {
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  if (!user.profileComplete) {
+    return <ProfileSetupPage />;
   }
 
   return (

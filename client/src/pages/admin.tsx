@@ -38,14 +38,16 @@ export default function AdminPage() {
   const [estateCity, setEstateCity] = useState("");
   const [estateProvince, setEstateProvince] = useState("");
 
+  const isAdmin = user?.isSuperAdmin || user?.role === "super_admin";
+
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
-    enabled: !!user?.isSuperAdmin,
+    enabled: !!isAdmin,
   });
 
   const { data: estates = [], isLoading: estatesLoading } = useQuery<Estate[]>({
     queryKey: ["/api/admin/estates"],
-    enabled: !!user?.isSuperAdmin,
+    enabled: !!isAdmin,
   });
 
   const createEstateMutation = useMutation({
@@ -77,7 +79,7 @@ export default function AdminPage() {
     });
   };
 
-  if (!user?.isSuperAdmin) {
+  if (!isAdmin) {
     return (
       <div className="text-center py-20">
         <Shield className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
@@ -263,9 +265,14 @@ export default function AdminPage() {
                       <p className="text-xs text-muted-foreground">{u.email}</p>
                     </div>
                   </div>
-                  {u.isSuperAdmin && (
+                  {(u.isSuperAdmin || u.role === "super_admin") && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                       Super Admin
+                    </span>
+                  )}
+                  {u.role && u.role !== "super_admin" && !u.isSuperAdmin && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground capitalize">
+                      {u.role.replace("_", " ")}
                     </span>
                   )}
                 </div>

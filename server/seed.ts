@@ -24,7 +24,7 @@ export async function seedDatabase() {
   const { db } = await import("./db");
   const { users } = await import("@shared/schema");
   const { eq } = await import("drizzle-orm");
-  await db.update(users).set({ isSuperAdmin: true }).where(eq(users.id, admin.id));
+  await db.update(users).set({ isSuperAdmin: true, role: "super_admin", profileComplete: true, phone: "011 000 0000", suburb: "Sandton" }).where(eq(users.id, admin.id));
 
   const demoPassword = await hashPassword("demo123");
   const demo = await storage.createUser({
@@ -32,6 +32,7 @@ export async function seedDatabase() {
     password: demoPassword,
     fullName: "Sarah Johnson",
   });
+  await db.update(users).set({ profileComplete: true, phone: "082 555 1234", suburb: "Sandton" }).where(eq(users.id, demo.id));
 
   const estate1 = await storage.createEstate({
     name: "Greenwood Estate",

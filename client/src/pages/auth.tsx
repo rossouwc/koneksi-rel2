@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, ArrowRight, Sparkles } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 
 export default function AuthPage() {
@@ -13,6 +14,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login, register } = useAuth();
   const { toast } = useToast();
@@ -35,6 +37,13 @@ export default function AuthPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoogleAuth = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Google sign-in will be available shortly.",
+    });
   };
 
   return (
@@ -92,12 +101,27 @@ export default function AuthPage() {
                 className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all duration-300 ${
                   mode === m
                     ? "bg-white/20 text-white shadow-sm"
-                    : "text-white/60"
+                    : "text-white/60 hover:text-white/80"
                 }`}
               >
                 {m === "login" ? "Sign In" : "Create Account"}
               </button>
             ))}
+          </div>
+
+          <button
+            onClick={handleGoogleAuth}
+            data-testid="button-google-auth"
+            className="w-full flex items-center justify-center gap-3 py-3 rounded-xl bg-white/10 border border-white/15 text-white font-medium text-sm hover:bg-white/15 transition-all duration-200 mb-5"
+          >
+            <SiGoogle className="w-4 h-4" />
+            Continue with Google
+          </button>
+
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 h-px bg-white/20" />
+            <span className="text-white/40 text-xs uppercase tracking-wider">or</span>
+            <div className="flex-1 h-px bg-white/20" />
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -143,42 +167,69 @@ export default function AuthPage() {
             </div>
 
             <div>
-              <Label className="text-white/90 text-sm mb-1.5 block">Password</Label>
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="text-white/90 text-sm">Password</Label>
+                {mode === "login" && (
+                  <button
+                    type="button"
+                    data-testid="link-forgot-password"
+                    onClick={() =>
+                      toast({
+                        title: "Password Reset",
+                        description: "Check your email for a password reset link.",
+                      })
+                    }
+                    className="text-xs text-white/60 hover:text-white/90 transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                 <Input
                   data-testid="input-password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min 6 characters"
-                  className="pl-10 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent"
+                  className="pl-10 pr-10 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent"
                   required
                   minLength={6}
                 />
+                <button
+                  type="button"
+                  data-testid="button-toggle-password"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
-            <Button
-              data-testid="button-auth-submit"
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-xl bg-white text-teal-700 font-semibold py-6 text-base"
-            >
-              {isSubmitting ? (
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                >
-                  <Sparkles className="w-5 h-5" />
-                </motion.div>
-              ) : (
-                <span className="flex items-center gap-2">
-                  {mode === "login" ? "Sign In" : "Create Account"}
-                  <ArrowRight className="w-4 h-4" />
-                </span>
-              )}
-            </Button>
+            <motion.div whileTap={{ scale: 0.98 }}>
+              <Button
+                data-testid="button-auth-submit"
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-xl bg-white text-teal-700 font-semibold py-6 text-base hover:bg-white/90 transition-all duration-200"
+              >
+                {isSubmitting ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </motion.div>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    {mode === "login" ? "Sign In" : "Create Account"}
+                    <ArrowRight className="w-4 h-4" />
+                  </span>
+                )}
+              </Button>
+            </motion.div>
           </form>
         </motion.div>
 

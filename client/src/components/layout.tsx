@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth";
@@ -15,8 +15,10 @@ import {
   Sun,
   Moon,
   LogOut,
-  ChevronDown,
   Building2,
+  User,
+  Settings,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,14 +37,97 @@ const navItems = [
   { path: "/providers", label: "Providers", icon: Store },
 ];
 
+function AvatarDropdown() {
+  const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const initials = user?.fullName
+    ? user.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "U";
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        data-testid="button-avatar-dropdown"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 rounded-full hover:opacity-90 transition-opacity"
+      >
+        <div className="w-8 h-8 rounded-full gradient-teal flex items-center justify-center text-white text-xs font-bold">
+          {initials}
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-border bg-popover shadow-lg overflow-hidden z-50"
+          >
+            <div className="px-4 py-3 border-b border-border">
+              <p className="text-sm font-medium text-foreground truncate" data-testid="text-avatar-name">{user?.fullName}</p>
+              <p className="text-xs text-muted-foreground truncate" data-testid="text-avatar-email">{user?.email}</p>
+              {user?.role && (
+                <span className="inline-block mt-1 text-[10px] uppercase tracking-wider font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full" data-testid="text-avatar-role">
+                  {user.role.replace("_", " ")}
+                </span>
+              )}
+            </div>
+
+            <div className="py-1">
+              <button
+                data-testid="button-dropdown-theme"
+                onClick={() => { toggleTheme(); setOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
+              >
+                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                {theme === "dark" ? "Light Mode" : "Dark Mode"}
+              </button>
+
+              <button
+                data-testid="button-dropdown-logout"
+                onClick={() => { logout(); setOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-accent transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { currentEstate, estates, setCurrentEstate } = useEstate();
   const { theme, toggleTheme } = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const isAdmin = user?.isSuperAdmin;
+  const isAdmin = user?.isSuperAdmin || user?.role === "super_admin";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -138,20 +223,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 variant="ghost"
                 onClick={toggleTheme}
                 data-testid="button-theme-toggle"
-                className="rounded-lg"
+                className="rounded-lg hidden md:flex"
               >
                 {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </Button>
 
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={logout}
-                data-testid="button-logout"
-                className="rounded-lg"
-              >
-                <LogOut className="w-4 h-4" />
-              </Button>
+              <AvatarDropdown />
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { pgTable, text, varchar, timestamp, integer, boolean, pgEnum } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const userRoleEnum = pgEnum("user_role", ["resident", "estate_admin", "super_admin", "supplier"]);
 export const estateRoleEnum = pgEnum("estate_role", ["resident", "estate_admin"]);
 export const outageTypeEnum = pgEnum("outage_type", ["electricity", "water", "internet", "gas", "other"]);
 export const outageStatusEnum = pgEnum("outage_status", ["reported", "confirmed", "resolved"]);
@@ -12,7 +13,11 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   fullName: text("full_name").notNull(),
+  phone: text("phone"),
+  suburb: text("suburb"),
   avatarUrl: text("avatar_url"),
+  role: userRoleEnum("role").default("resident"),
+  profileComplete: boolean("profile_complete").default(false),
   isSuperAdmin: boolean("is_super_admin").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -84,7 +89,7 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, isSuperAdmin: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, isSuperAdmin: true, profileComplete: true, role: true });
 export const insertEstateSchema = createInsertSchema(estates).omit({ id: true, createdAt: true, inviteCode: true });
 export const insertUserEstateSchema = createInsertSchema(userEstates).omit({ id: true, joinedAt: true });
 export const insertBillSchema = createInsertSchema(bills).omit({ id: true, createdAt: true });
@@ -101,6 +106,12 @@ export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   fullName: z.string().min(2),
+});
+
+export const profileSetupSchema = z.object({
+  phone: z.string().optional(),
+  suburb: z.string().optional(),
+  fullName: z.string().min(2).optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
