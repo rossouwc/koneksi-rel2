@@ -52,6 +52,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `/join-estate` - Join estate via invite code + view current estates + create estate (admin only)
 - `/bill-analyzer` - AI-powered bill analysis: drag-drop/camera upload, hardcoded sample analysis, results cards (extracted data, overcharges, savings tips), saves to bills table
 - `/alerts` - Outage alerts with Leaflet map view, list view, FAB to report, photo upload, type filtering, polling
+- `/marketplace` - Product marketplace: responsive grid of estate/home products (water tanks, solar gear, security, etc.), category chips, search, product cards with images/pricing/badges, "View Deal" affiliate buttons
 - `/supplier` - Supplier portal: dashboard with mock analytics (views, clicks, inquiries), tier display, upgrade flow with 5-tier pricing cards, estate/city/province selection, PayFast payment initiation, confetti on upgrade
 - `/admin` - Super admin portal with DataTable views, estate detail sub-view, create/edit dialogs (requires super_admin role)
 
@@ -66,8 +67,10 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - Savings Tracker: animated counter, Recharts area chart (6-month contiguous series), expandable bill history (capped at 20), personal/estate toggle, canvas-confetti on savings detected
 
 ## PWA
-- `client/public/manifest.json` - PWA manifest
-- `client/public/sw.js` - Service worker for offline caching
+- `client/public/manifest.json` - PWA manifest with app shortcuts, categories, maskable icons
+- `client/public/sw.js` - Service worker (koneksi-v3): static + API caching (bills, providers, outages, estates), offline fallback with X-Koneksi-Cached header, navigation cache, upload file cache
+- `client/src/components/offline-banner.tsx` - Amber offline banner with retry button, auto-hides on reconnect
+- `client/index.html` - Apple mobile web app meta tags, Open Graph tags, dark theme-color support
 
 ## Design
 - Glassmorphism: `.glass`, `.glass-card` CSS utilities

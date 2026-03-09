@@ -6,6 +6,7 @@ import {
   Receipt,
   Zap,
   Store,
+  ShoppingBag,
   TrendingUp,
   AlertTriangle,
   CheckCircle2,
@@ -175,7 +176,30 @@ export default function Dashboard() {
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35, duration: 0.4 }}
+        transition={{ delay: 0.34, duration: 0.4 }}
+      >
+        <Link href="/marketplace">
+          <div className="glass-card rounded-2xl p-5 cursor-pointer hover:shadow-lg transition-shadow group" data-testid="link-marketplace">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center flex-shrink-0">
+                  <ShoppingBag className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">Marketplace</h3>
+                  <p className="text-xs text-muted-foreground">Water tanks, solar gear, security & more for your estate</p>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+            </div>
+          </div>
+        </Link>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.37, duration: 0.4 }}
       >
         <SavingsTracker />
       </motion.div>

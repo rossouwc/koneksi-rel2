@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { EstateProvider } from "@/lib/estate-context";
+import { OfflineBanner } from "@/components/offline-banner";
 import Layout from "@/components/layout";
 import AuthPage from "@/pages/auth";
 import ProfileSetupPage from "@/pages/profile-setup";
@@ -17,6 +18,7 @@ import AdminPage from "@/pages/admin";
 import AlertsPage from "@/pages/alerts";
 import BillAnalyzerPage from "@/pages/bill-analyzer";
 import SupplierPortalPage from "@/pages/supplier-portal";
+import MarketplacePage from "@/pages/marketplace";
 import JoinEstatePage from "@/pages/join-estate";
 import NotFound from "@/pages/not-found";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -53,6 +55,7 @@ function AppContent() {
           <Route path="/providers" component={ProvidersPage} />
           <Route path="/alerts" component={AlertsPage} />
           <Route path="/bill-analyzer" component={BillAnalyzerPage} />
+          <Route path="/marketplace" component={MarketplacePage} />
           <Route path="/supplier" component={SupplierPortalPage} />
           <Route path="/admin" component={AdminPage} />
           <Route path="/join-estate" component={JoinEstatePage} />
@@ -69,6 +72,7 @@ function App() {
       <ThemeProvider>
         <TooltipProvider>
           <AuthProvider>
+            <OfflineBanner />
             <AppContent />
           </AuthProvider>
           <Toaster />

@@ -1,22 +1,45 @@
 {
-  "name": "Koneksi",
+  "name": "Koneksi - Smart Estate Management",
   "short_name": "Koneksi",
-  "description": "Smart estate management for modern communities",
+  "description": "Smart estate management for modern communities. Manage bills, outages, providers, and more.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f766e",
   "theme_color": "#0f766e",
   "orientation": "portrait-primary",
+  "categories": ["utilities", "lifestyle", "business"],
+  "scope": "/",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/favicon.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/favicon.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/",
+      "icons": [{ "src": "/favicon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Bills",
+      "url": "/bills",
+      "icons": [{ "src": "/favicon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Marketplace",
+      "url": "/marketplace",
+      "icons": [{ "src": "/favicon.png", "sizes": "192x192" }]
     }
   ]
 }

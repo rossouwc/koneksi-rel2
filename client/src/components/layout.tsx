@@ -9,6 +9,7 @@ import {
   Receipt,
   Zap,
   Store,
+  ShoppingBag,
   Shield,
   Crown,
   Menu,
@@ -40,6 +41,7 @@ const navItems = [
   { path: "/outages", label: "Outages", icon: Zap },
   { path: "/alerts", label: "Alerts", icon: Bell },
   { path: "/providers", label: "Providers", icon: Store },
+  { path: "/marketplace", label: "Market", icon: ShoppingBag },
 ];
 
 function AvatarDropdown() {

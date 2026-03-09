@@ -66,6 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     await logoutMutation.mutateAsync();
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage("clearApiCache");
+    }
   };
 
   return (
