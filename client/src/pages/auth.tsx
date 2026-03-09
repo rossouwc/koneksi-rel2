@@ -10,18 +10,7 @@ import { Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff, Briefcase, Phone, 
 import { SiGoogle } from "react-icons/si";
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 
-const SERVICE_OPTIONS = [
-  "Plumbing",
-  "Electrical",
-  "Pool Maintenance",
-  "Solar Installation",
-  "Gardening",
-  "Pest Control",
-  "Painting",
-  "General Maintenance",
-  "Leak Detection",
-  "Water Purification",
-];
+import { SERVICE_OPTIONS } from "@shared/schema";
 
 const SA_PROVINCES = [
   "Gauteng",

@@ -84,8 +84,22 @@ export const providers = pgTable("providers", {
   email: text("email"),
   website: text("website"),
   description: text("description"),
+  services: text("services").array(),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const SERVICE_OPTIONS = [
+  "Plumbing",
+  "Electrical",
+  "Pool Maintenance",
+  "Solar Installation",
+  "Gardening",
+  "Pest Control",
+  "Painting",
+  "General Maintenance",
+  "Leak Detection",
+  "Water Purification",
+] as const;
 
 export const reviews = pgTable("reviews", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

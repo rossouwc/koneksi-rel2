@@ -12,7 +12,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - **State**: TanStack React Query
 
 ## Architecture
-- `shared/schema.ts` - Drizzle schemas and Zod validation for all entities
+- `shared/schema.ts` - Drizzle schemas, Zod validation, and shared constants (SERVICE_OPTIONS) for all entities
 - `server/db.ts` - PostgreSQL connection pool
 - `server/storage.ts` - Database storage layer (IStorage interface with RLS-style scoped queries)
 - `server/routes.ts` - Express API routes with session auth + estate membership verification

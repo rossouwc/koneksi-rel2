@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -21,6 +21,8 @@ import {
   User,
   Clock,
   Crown,
+  Wrench,
+  X,
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Button } from "@/components/ui/button";
@@ -28,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +45,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { SERVICE_OPTIONS } from "@shared/schema";
 import type { Provider, Review } from "@shared/schema";
 
 const providerCategories = [
@@ -306,6 +315,58 @@ function ProviderDetail({
         </div>
       </motion.div>
 
+      {provider.services && provider.services.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="glass-card rounded-2xl p-5"
+          data-testid="section-provider-services"
+        >
+          <h2 className="font-semibold flex items-center gap-2 mb-3">
+            <Wrench className="w-4 h-4 text-primary" />
+            Services
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {provider.services.map((s) => (
+              <Badge
+                key={s}
+                variant="outline"
+                className={`text-xs px-3 py-1 rounded-full font-medium border ${getServiceColor(s)}`}
+                data-testid={`badge-detail-service-${s.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                {s}
+              </Badge>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {provider.website && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="glass-card rounded-2xl p-5"
+          data-testid="section-provider-website"
+        >
+          <h2 className="font-semibold flex items-center gap-2 mb-3">
+            <Globe className="w-4 h-4 text-primary" />
+            Website
+          </h2>
+          <a
+            href={provider.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-primary hover:underline flex items-center gap-1.5"
+            data-testid="link-detail-website"
+          >
+            {provider.website.replace(/^https?:\/\//, "")}
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </motion.div>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -410,6 +471,162 @@ const tierBadgeColors: Record<string, string> = {
   National: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
 };
 
+const serviceBadgeColors = [
+  "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20",
+  "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
+  "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
+  "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
+  "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20",
+  "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20",
+  "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20",
+  "bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/20",
+];
+
+function getServiceColor(service: string) {
+  let hash = 0;
+  for (let i = 0; i < service.length; i++) {
+    hash = service.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return serviceBadgeColors[Math.abs(hash) % serviceBadgeColors.length];
+}
+
+function ServiceTags({ services, max = 3, size = "sm" }: { services: string[]; max?: number; size?: "sm" | "md" }) {
+  const visible = services.slice(0, max);
+  const remaining = services.length - max;
+  const textSize = size === "sm" ? "text-[9px]" : "text-xs";
+  const padding = size === "sm" ? "px-1.5 py-0" : "px-2 py-0.5";
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap" data-testid="container-service-tags">
+      {visible.map((s) => (
+        <Badge
+          key={s}
+          variant="outline"
+          className={`${textSize} ${padding} rounded-full font-medium border ${getServiceColor(s)}`}
+          data-testid={`badge-service-${s.toLowerCase().replace(/\s+/g, "-")}`}
+        >
+          {s}
+        </Badge>
+      ))}
+      {remaining > 0 && (
+        <HoverCard>
+          <HoverCardTrigger asChild>
+            <Badge
+              variant="outline"
+              className={`${textSize} ${padding} rounded-full font-medium cursor-pointer border bg-muted/40 text-muted-foreground hover:bg-muted/60`}
+              data-testid="badge-more-services"
+            >
+              +{remaining} more
+            </Badge>
+          </HoverCardTrigger>
+          <HoverCardContent className="w-auto p-3" side="top" align="start">
+            <div className="flex flex-wrap gap-1.5 max-w-[200px]">
+              {services.slice(max).map((s) => (
+                <Badge
+                  key={s}
+                  variant="outline"
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${getServiceColor(s)}`}
+                >
+                  {s}
+                </Badge>
+              ))}
+            </div>
+          </HoverCardContent>
+        </HoverCard>
+      )}
+    </div>
+  );
+}
+
+function ServicesFilter({
+  selectedServices,
+  onChange,
+}: {
+  selectedServices: string[];
+  onChange: (services: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const toggle = (s: string) => {
+    onChange(
+      selectedServices.includes(s)
+        ? selectedServices.filter((x) => x !== s)
+        : [...selectedServices, s]
+    );
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <Button
+        variant="outline"
+        size="sm"
+        className={`rounded-xl h-9 text-xs gap-1.5 ${selectedServices.length > 0 ? "border-primary text-primary" : ""}`}
+        onClick={() => setOpen(!open)}
+        data-testid="button-filter-services"
+      >
+        <Wrench className="w-3 h-3" />
+        Services
+        {selectedServices.length > 0 && (
+          <span className="ml-0.5 w-4 h-4 rounded-full bg-primary text-white text-[9px] flex items-center justify-center">
+            {selectedServices.length}
+          </span>
+        )}
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </Button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 w-56 rounded-xl border bg-popover shadow-lg overflow-hidden" data-testid="dropdown-filter-services">
+          <div className="p-1.5 border-b">
+            {selectedServices.length > 0 && (
+              <button
+                className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-1"
+                onClick={() => onChange([])}
+                data-testid="button-clear-services-filter"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+          <div className="max-h-[240px] overflow-y-auto p-1">
+            {[...SERVICE_OPTIONS].map((service) => (
+              <button
+                key={service}
+                type="button"
+                onClick={() => toggle(service)}
+                className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center gap-2 ${
+                  selectedServices.includes(service)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-foreground hover:bg-muted/50"
+                }`}
+                data-testid={`option-filter-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[8px] ${
+                  selectedServices.includes(service)
+                    ? "bg-primary border-primary text-white"
+                    : "border-muted-foreground/30"
+                }`}>
+                  {selectedServices.includes(service) && "✓"}
+                </span>
+                {service}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProviderCard({
   provider,
   reviews,
@@ -474,6 +691,12 @@ function ProviderCard({
           <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{provider.description}</p>
         )}
 
+        {provider.services && provider.services.length > 0 && (
+          <div className="mb-3" data-testid={`container-card-services-${provider.id}`}>
+            <ServiceTags services={provider.services} max={3} />
+          </div>
+        )}
+
         <div className="flex items-center gap-2 flex-wrap">
           {provider.phone && (
             <a
@@ -517,6 +740,20 @@ function ProviderCard({
               </Button>
             </a>
           )}
+          {provider.website && (
+            <a
+              href={provider.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`link-website-${provider.id}`}
+            >
+              <Button variant="outline" size="sm" className="rounded-lg h-7 text-[10px] gap-1 px-2">
+                <Globe className="w-3 h-3" />
+                Website
+              </Button>
+            </a>
+          )}
         </div>
       </div>
     </motion.div>
@@ -529,6 +766,7 @@ export default function ProvidersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [ratingFilter, setRatingFilter] = useState("all");
+  const [servicesFilter, setServicesFilter] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -538,6 +776,8 @@ export default function ProvidersPage() {
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
   const [description, setDescription] = useState("");
+  const [providerServices, setProviderServices] = useState<string[]>([]);
+  const [showProviderServicesDrop, setShowProviderServicesDrop] = useState(false);
 
   const providersUrl = currentEstate ? `/api/providers?estateId=${currentEstate.id}` : "/api/providers";
   const { data: providers = [], isLoading } = useQuery<Provider[]>({
@@ -562,6 +802,8 @@ export default function ProvidersPage() {
       setEmail("");
       setWebsite("");
       setDescription("");
+      setProviderServices([]);
+      setShowProviderServicesDrop(false);
       toast({ title: "Provider added successfully" });
     },
     onError: (err: any) => {
@@ -579,6 +821,7 @@ export default function ProvidersPage() {
       email: email || null,
       website: website || null,
       description: description || null,
+      services: providerServices.length > 0 ? providerServices : null,
       estateId: currentEstate?.id || null,
     });
   };
@@ -604,7 +847,11 @@ export default function ProvidersPage() {
       const avg = getAverageRating(p.id);
       const matchesRating = ratingFilter === "all" || avg >= parseInt(ratingFilter);
 
-      return matchesSearch && matchesCategory && matchesRating;
+      const matchesServices = servicesFilter.length === 0 || (
+        p.services && servicesFilter.some((s) => p.services!.includes(s))
+      );
+
+      return matchesSearch && matchesCategory && matchesRating && matchesServices;
     });
 
     const tierPriority: Record<string, number> = { National: 5, Province: 4, City: 3, Local: 2, Free: 1 };
@@ -616,7 +863,7 @@ export default function ProvidersPage() {
       if (bPriority !== aPriority) return bPriority - aPriority;
       return getAverageRating(b.id) - getAverageRating(a.id);
     });
-  }, [providers, searchQuery, categoryFilter, ratingFilter, allReviews]);
+  }, [providers, searchQuery, categoryFilter, ratingFilter, servicesFilter, allReviews]);
 
   const activeCategories = useMemo(() => {
     const cats = new Set(providers.map((p) => p.category.toLowerCase()));
@@ -725,6 +972,66 @@ export default function ProvidersPage() {
                 />
               </div>
               <div>
+                <Label className="text-sm">Services</Label>
+                <div className="relative mt-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-lg justify-between text-sm font-normal h-10"
+                    onClick={() => setShowProviderServicesDrop(!showProviderServicesDrop)}
+                    data-testid="button-provider-services-dropdown"
+                  >
+                    {providerServices.length > 0 ? `${providerServices.length} selected` : "Select services"}
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showProviderServicesDrop ? "rotate-180" : ""}`} />
+                  </Button>
+                  {showProviderServicesDrop && (
+                    <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border bg-popover shadow-lg overflow-hidden">
+                      <div className="max-h-[200px] overflow-y-auto p-1">
+                        {[...SERVICE_OPTIONS].map((service) => (
+                          <button
+                            key={service}
+                            type="button"
+                            onClick={() => {
+                              setProviderServices(
+                                providerServices.includes(service)
+                                  ? providerServices.filter((s) => s !== service)
+                                  : [...providerServices, service]
+                              );
+                            }}
+                            className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center gap-2 ${
+                              providerServices.includes(service) ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-muted/50"
+                            }`}
+                            data-testid={`option-add-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
+                          >
+                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[8px] ${
+                              providerServices.includes(service) ? "bg-primary border-primary text-white" : "border-muted-foreground/30"
+                            }`}>
+                              {providerServices.includes(service) && "✓"}
+                            </span>
+                            {service}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {providerServices.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {providerServices.map((s) => (
+                        <Badge
+                          key={s}
+                          variant="outline"
+                          className={`text-[10px] px-2 py-0.5 rounded-full border ${getServiceColor(s)} cursor-pointer`}
+                          onClick={() => setProviderServices(providerServices.filter((x) => x !== s))}
+                        >
+                          {s}
+                          <X className="w-2.5 h-2.5 ml-1" />
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div>
                 <Label className="text-sm">Description</Label>
                 <Textarea
                   data-testid="input-provider-description"
@@ -776,6 +1083,8 @@ export default function ProvidersPage() {
             </SelectContent>
           </Select>
 
+          <ServicesFilter selectedServices={servicesFilter} onChange={setServicesFilter} />
+
           <Select value={ratingFilter} onValueChange={setRatingFilter}>
             <SelectTrigger className="rounded-xl w-auto min-w-[120px] h-9 text-xs" data-testid="select-filter-rating">
               <Star className="w-3 h-3 mr-1.5" />
@@ -809,7 +1118,7 @@ export default function ProvidersPage() {
           </div>
           <h3 className="text-lg font-semibold mb-1">No providers found</h3>
           <p className="text-sm text-muted-foreground">
-            {searchQuery || categoryFilter !== "all" || ratingFilter !== "all"
+            {searchQuery || categoryFilter !== "all" || ratingFilter !== "all" || servicesFilter.length > 0
               ? "Try adjusting your filters"
               : "Add your first service provider"}
           </p>

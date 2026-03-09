@@ -51,17 +51,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SERVICE_OPTIONS } from "@shared/schema";
 import type { SubscriptionTier, Estate } from "@shared/schema";
 
 const providerCategories = [
   "Plumber", "Electrician", "Gardener", "Security", "Cleaning",
   "Handyman", "Pest Control", "Internet", "Painter", "Locksmith", "Other",
-];
-
-const SERVICE_OPTIONS = [
-  "Plumbing", "Electrical", "Pool Maintenance", "Solar Installation",
-  "Gardening", "Pest Control", "Painting", "General Maintenance",
-  "Leak Detection", "Water Purification",
 ];
 
 const tierIcons: Record<string, typeof Building2> = {
