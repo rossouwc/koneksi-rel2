@@ -14,6 +14,7 @@ import BillsPage from "@/pages/bills";
 import OutagesPage from "@/pages/outages";
 import ProvidersPage from "@/pages/providers";
 import AdminPage from "@/pages/admin";
+import JoinEstatePage from "@/pages/join-estate";
 import NotFound from "@/pages/not-found";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -48,6 +49,7 @@ function AppContent() {
           <Route path="/outages" component={OutagesPage} />
           <Route path="/providers" component={ProvidersPage} />
           <Route path="/admin" component={AdminPage} />
+          <Route path="/join-estate" component={JoinEstatePage} />
           <Route component={NotFound} />
         </Switch>
       </Layout>

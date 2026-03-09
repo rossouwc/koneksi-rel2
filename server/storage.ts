@@ -9,7 +9,7 @@ import {
   users, estates, userEstates, bills, outages, providers, reviews,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -22,21 +22,23 @@ export interface IStorage {
   getEstate(id: string): Promise<Estate | undefined>;
   getEstateByInviteCode(code: string): Promise<Estate | undefined>;
   getUserEstates(userId: string): Promise<Estate[]>;
+  getUserEstateIds(userId: string): Promise<string[]>;
   getAllEstates(): Promise<Estate[]>;
   createEstate(estate: InsertEstate): Promise<Estate>;
 
   getUserEstateLink(userId: string, estateId: string): Promise<UserEstate | undefined>;
   addUserToEstate(data: InsertUserEstate): Promise<UserEstate>;
 
-  getBills(userId: string, estateId?: string): Promise<Bill[]>;
+  getBillsScoped(userId: string, estateIds: string[], estateId?: string): Promise<Bill[]>;
   createBill(bill: InsertBill): Promise<Bill>;
 
-  getOutages(estateId?: string): Promise<Outage[]>;
+  getOutagesScoped(userId: string, estateIds: string[], estateId?: string): Promise<Outage[]>;
   createOutage(outage: InsertOutage): Promise<Outage>;
 
-  getProviders(estateId?: string): Promise<Provider[]>;
+  getProvidersScoped(userId: string, estateIds: string[], estateId?: string): Promise<Provider[]>;
   createProvider(provider: InsertProvider): Promise<Provider>;
 
+  getProvider(id: string): Promise<Provider | undefined>;
   getReviews(providerId?: string): Promise<Review[]>;
   createReview(review: InsertReview): Promise<Review>;
 }
@@ -88,6 +90,11 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getUserEstateIds(userId: string): Promise<string[]> {
+    const links = await db.select({ estateId: userEstates.estateId }).from(userEstates).where(eq(userEstates.userId, userId));
+    return links.map((l) => l.estateId);
+  }
+
   async getAllEstates(): Promise<Estate[]> {
     return db.select().from(estates).orderBy(desc(estates.createdAt));
   }
@@ -111,13 +118,17 @@ export class DatabaseStorage implements IStorage {
     return link;
   }
 
-  async getBills(userId: string, estateId?: string): Promise<Bill[]> {
+  async getBillsScoped(userId: string, estateIds: string[], estateId?: string): Promise<Bill[]> {
     if (estateId) {
-      return db.select().from(bills).where(
-        and(eq(bills.userId, userId), eq(bills.estateId, estateId))
-      ).orderBy(desc(bills.createdAt));
+      return db.select().from(bills).where(eq(bills.estateId, estateId)).orderBy(desc(bills.createdAt));
     }
-    return db.select().from(bills).where(eq(bills.userId, userId)).orderBy(desc(bills.createdAt));
+    const conditions = [
+      and(eq(bills.userId, userId), isNull(bills.estateId)),
+    ];
+    if (estateIds.length > 0) {
+      conditions.push(inArray(bills.estateId, estateIds));
+    }
+    return db.select().from(bills).where(or(...conditions)).orderBy(desc(bills.createdAt));
   }
 
   async createBill(bill: InsertBill): Promise<Bill> {
@@ -125,11 +136,21 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getOutages(estateId?: string): Promise<Outage[]> {
+  async getOutagesScoped(userId: string, estateIds: string[], estateId?: string): Promise<Outage[]> {
     if (estateId) {
       return db.select().from(outages).where(eq(outages.estateId, estateId)).orderBy(desc(outages.createdAt));
     }
-    return db.select().from(outages).orderBy(desc(outages.createdAt));
+    if (estateIds.length > 0) {
+      return db.select().from(outages).where(
+        or(
+          inArray(outages.estateId, estateIds),
+          and(eq(outages.userId, userId), isNull(outages.estateId))
+        )
+      ).orderBy(desc(outages.createdAt));
+    }
+    return db.select().from(outages).where(
+      and(eq(outages.userId, userId), isNull(outages.estateId))
+    ).orderBy(desc(outages.createdAt));
   }
 
   async createOutage(outage: InsertOutage): Promise<Outage> {
@@ -137,16 +158,24 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getProviders(estateId?: string): Promise<Provider[]> {
+  async getProvidersScoped(userId: string, estateIds: string[], estateId?: string): Promise<Provider[]> {
     if (estateId) {
       return db.select().from(providers).where(eq(providers.estateId, estateId)).orderBy(desc(providers.createdAt));
     }
-    return db.select().from(providers).orderBy(desc(providers.createdAt));
+    if (estateIds.length > 0) {
+      return db.select().from(providers).where(inArray(providers.estateId, estateIds)).orderBy(desc(providers.createdAt));
+    }
+    return [];
   }
 
   async createProvider(provider: InsertProvider): Promise<Provider> {
     const [created] = await db.insert(providers).values(provider).returning();
     return created;
+  }
+
+  async getProvider(id: string): Promise<Provider | undefined> {
+    const [provider] = await db.select().from(providers).where(eq(providers.id, id));
+    return provider;
   }
 
   async getReviews(providerId?: string): Promise<Review[]> {

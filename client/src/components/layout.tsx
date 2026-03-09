@@ -16,9 +16,9 @@ import {
   Moon,
   LogOut,
   Building2,
-  User,
-  Settings,
   ChevronDown,
+  UserCircle,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
+
+const PERSONAL_VALUE = "__personal__";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -129,6 +131,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = user?.isSuperAdmin || user?.role === "super_admin";
 
+  const allNavItems = [
+    ...navItems,
+    { path: "/join-estate", label: "Estates", icon: Building2 },
+  ];
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 border-b border-border/40">
@@ -194,29 +201,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </nav>
 
             <div className="flex items-center gap-2">
-              {estates.length > 0 && (
-                <Select
-                  value={currentEstate?.id || ""}
-                  onValueChange={(val) => {
+              <Select
+                value={currentEstate?.id || PERSONAL_VALUE}
+                onValueChange={(val) => {
+                  if (val === PERSONAL_VALUE) {
+                    setCurrentEstate(null);
+                  } else {
                     const estate = estates.find((e) => e.id === val);
                     if (estate) setCurrentEstate(estate);
-                  }}
+                  }
+                }}
+              >
+                <SelectTrigger
+                  data-testid="select-estate"
+                  className="w-[140px] md:w-[180px] rounded-lg text-xs md:text-sm h-9"
                 >
-                  <SelectTrigger
-                    data-testid="select-estate"
-                    className="w-[140px] md:w-[180px] rounded-lg text-xs md:text-sm h-9"
-                  >
-                    <SelectValue placeholder="Select estate" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {estates.map((e) => (
-                      <SelectItem key={e.id} value={e.id} data-testid={`estate-option-${e.id}`}>
-                        {e.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+                  <SelectValue placeholder="Select estate" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={PERSONAL_VALUE} data-testid="estate-option-personal">
+                    <span className="flex items-center gap-2">
+                      <UserCircle className="w-3.5 h-3.5" />
+                      Personal
+                    </span>
+                  </SelectItem>
+                  {estates.map((e) => (
+                    <SelectItem key={e.id} value={e.id} data-testid={`estate-option-${e.id}`}>
+                      {e.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Link href="/join-estate">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  data-testid="button-join-estate-nav"
+                  className="rounded-lg hidden md:flex"
+                  title="Join or manage estates"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </Link>
 
               <Button
                 size="icon"
@@ -247,7 +274,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             }}
           >
             <nav className="p-3 space-y-1">
-              {navItems.map((item) => {
+              {allNavItems.map((item) => {
                 const isActive = location === item.path;
                 return (
                   <Link key={item.path} href={item.path}>

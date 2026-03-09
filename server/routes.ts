@@ -70,6 +70,15 @@ export async function registerRoutes(
     next();
   }
 
+  async function getUserEstateIds(userId: string): Promise<string[]> {
+    return storage.getUserEstateIds(userId);
+  }
+
+  async function verifyEstateMembership(userId: string, estateId: string): Promise<boolean> {
+    const link = await storage.getUserEstateLink(userId, estateId);
+    return !!link;
+  }
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { email, password, fullName } = req.body;
@@ -147,11 +156,6 @@ export async function registerRoutes(
     }
   });
 
-  async function verifyEstateMembership(userId: string, estateId: string): Promise<boolean> {
-    const link = await storage.getUserEstateLink(userId, estateId);
-    return !!link;
-  }
-
   app.get("/api/estates", requireAuth, async (req, res) => {
     try {
       const estates = await storage.getUserEstates(req.session.userId!);
@@ -164,13 +168,16 @@ export async function registerRoutes(
   app.post("/api/estates/join", requireAuth, async (req, res) => {
     try {
       const { inviteCode } = req.body;
-      const estate = await storage.getEstateByInviteCode(inviteCode);
+      if (!inviteCode) {
+        return res.status(400).json({ message: "Invite code is required" });
+      }
+      const estate = await storage.getEstateByInviteCode(inviteCode.trim().toUpperCase());
       if (!estate) {
         return res.status(404).json({ message: "Invalid invite code" });
       }
       const existing = await storage.getUserEstateLink(req.session.userId!, estate.id);
       if (existing) {
-        return res.status(400).json({ message: "Already a member" });
+        return res.status(400).json({ message: "Already a member of this estate" });
       }
       await storage.addUserToEstate({ userId: req.session.userId!, estateId: estate.id, roleInEstate: "resident" });
       res.json(estate);
@@ -181,12 +188,15 @@ export async function registerRoutes(
 
   app.get("/api/bills", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const estateId = req.query.estateId as string | undefined;
-      if (estateId) {
-        const isMember = await verifyEstateMembership(req.session.userId!, estateId);
-        if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+      const memberEstateIds = await getUserEstateIds(userId);
+
+      if (estateId && !memberEstateIds.includes(estateId)) {
+        return res.status(403).json({ message: "Not a member of this estate" });
       }
-      const bills = await storage.getBills(req.session.userId!, estateId);
+
+      const bills = await storage.getBillsScoped(userId, memberEstateIds, estateId);
       res.json(bills);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -195,12 +205,15 @@ export async function registerRoutes(
 
   app.post("/api/bills", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const { estateId } = req.body;
+
       if (estateId) {
-        const isMember = await verifyEstateMembership(req.session.userId!, estateId);
+        const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
       }
-      const bill = await storage.createBill({ ...req.body, userId: req.session.userId! });
+
+      const bill = await storage.createBill({ ...req.body, userId });
       res.json(bill);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -209,21 +222,15 @@ export async function registerRoutes(
 
   app.get("/api/outages", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const estateId = req.query.estateId as string | undefined;
-      if (estateId) {
-        const isMember = await verifyEstateMembership(req.session.userId!, estateId);
-        if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+      const memberEstateIds = await getUserEstateIds(userId);
+
+      if (estateId && !memberEstateIds.includes(estateId)) {
+        return res.status(403).json({ message: "Not a member of this estate" });
       }
-      const userEstates = await storage.getUserEstates(req.session.userId!);
-      if (!estateId && userEstates.length > 0) {
-        const allOutages = [];
-        for (const e of userEstates) {
-          const outs = await storage.getOutages(e.id);
-          allOutages.push(...outs);
-        }
-        return res.json(allOutages);
-      }
-      const outages = await storage.getOutages(estateId);
+
+      const outages = await storage.getOutagesScoped(userId, memberEstateIds, estateId);
       res.json(outages);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -232,12 +239,15 @@ export async function registerRoutes(
 
   app.post("/api/outages", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const { estateId } = req.body;
+
       if (estateId) {
-        const isMember = await verifyEstateMembership(req.session.userId!, estateId);
+        const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
       }
-      const outage = await storage.createOutage({ ...req.body, userId: req.session.userId! });
+
+      const outage = await storage.createOutage({ ...req.body, userId });
       res.json(outage);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -246,21 +256,15 @@ export async function registerRoutes(
 
   app.get("/api/providers", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const estateId = req.query.estateId as string | undefined;
-      if (estateId) {
-        const isMember = await verifyEstateMembership(req.session.userId!, estateId);
-        if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+      const memberEstateIds = await getUserEstateIds(userId);
+
+      if (estateId && !memberEstateIds.includes(estateId)) {
+        return res.status(403).json({ message: "Not a member of this estate" });
       }
-      const userEstates = await storage.getUserEstates(req.session.userId!);
-      if (!estateId && userEstates.length > 0) {
-        const allProviders = [];
-        for (const e of userEstates) {
-          const provs = await storage.getProviders(e.id);
-          allProviders.push(...provs);
-        }
-        return res.json(allProviders);
-      }
-      const providers = await storage.getProviders(estateId);
+
+      const providers = await storage.getProvidersScoped(userId, memberEstateIds, estateId);
       res.json(providers);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -269,11 +273,14 @@ export async function registerRoutes(
 
   app.post("/api/providers", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const { estateId } = req.body;
+
       if (estateId) {
-        const isMember = await verifyEstateMembership(req.session.userId!, estateId);
+        const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
       }
+
       const provider = await storage.createProvider(req.body);
       res.json(provider);
     } catch (err: any) {
@@ -284,6 +291,13 @@ export async function registerRoutes(
   app.get("/api/reviews", requireAuth, async (req, res) => {
     try {
       const providerId = req.query.providerId as string | undefined;
+      if (providerId) {
+        const provider = await storage.getProvider(providerId);
+        if (provider?.estateId) {
+          const isMember = await verifyEstateMembership(req.session.userId!, provider.estateId);
+          if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+        }
+      }
       const reviews = await storage.getReviews(providerId);
       res.json(reviews);
     } catch (err: any) {
@@ -293,6 +307,14 @@ export async function registerRoutes(
 
   app.post("/api/reviews", requireAuth, async (req, res) => {
     try {
+      const { providerId } = req.body;
+      if (providerId) {
+        const provider = await storage.getProvider(providerId);
+        if (provider?.estateId) {
+          const isMember = await verifyEstateMembership(req.session.userId!, provider.estateId);
+          if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+        }
+      }
       const review = await storage.createReview({ ...req.body, userId: req.session.userId! });
       res.json(review);
     } catch (err: any) {

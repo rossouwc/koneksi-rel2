@@ -12,18 +12,27 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 ## Architecture
 - `shared/schema.ts` - Drizzle schemas and Zod validation for all entities
 - `server/db.ts` - PostgreSQL connection pool
-- `server/storage.ts` - Database storage layer (IStorage interface)
-- `server/routes.ts` - Express API routes with session auth
+- `server/storage.ts` - Database storage layer (IStorage interface with RLS-style scoped queries)
+- `server/routes.ts` - Express API routes with session auth + estate membership verification
 - `server/seed.ts` - Seed data for demo (admin@koneksi.app / admin123, demo@koneksi.app / demo123)
 - `client/src/lib/auth.tsx` - Auth context provider (useAuth hook)
 - `client/src/lib/theme.tsx` - Dark/light theme provider with system preference detection
 - `client/src/lib/estate-context.tsx` - Multi-tenant estate context with localStorage persistence
+  - Exports: `useEstate`, `useCurrentEstate`, `useEstatesList`, `useJoinEstate`
 - `client/src/hooks/use-user-profile.ts` - useUserProfile hook for profile data and mutations
+
+## Multi-Tenant Architecture
+- Estate selector in header with "Personal" option (no estate) + all user's estates
+- `current_estate_id` persisted in localStorage, `__personal__` sentinel for personal mode
+- All data queries scoped: estate-specific data only visible to estate members
+- Personal data (estateId IS NULL) only visible to the owner
+- Storage layer uses `getBillsScoped`, `getOutagesScoped`, `getProvidersScoped` for RLS enforcement
+- Routes verify estate membership before allowing read/write operations
 
 ## Data Model
 - **users** - id, email, password, fullName, phone, suburb, avatarUrl, role (user_role enum), profileComplete, isSuperAdmin
   - role enum: resident, estate_admin, super_admin, supplier
-- **estates** - id, name, suburb, city, province, inviteCode
+- **estates** - id, name, suburb, city, province, inviteCode (auto-generated 8-char uppercase)
 - **user_estates** - junction table (userId, estateId, roleInEstate)
 - **bills** - userId, estateId, title, amount (cents), dueDate, category, status
 - **outages** - userId, estateId, type (electricity/water/internet/gas/other), title, description, status
@@ -37,9 +46,11 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `/bills` - Bill management with add dialog
 - `/outages` - Outage reporting and tracking
 - `/providers` - Service providers directory with reviews
+- `/join-estate` - Join estate via invite code + view current estates + create estate (admin only)
 - `/admin` - Super admin portal (requires super_admin role or isSuperAdmin)
 
 ## Key UI Features
+- Estate selector dropdown with "Personal" + estates + "+" button to join/manage estates
 - Avatar dropdown in header with user info, role badge, theme toggle, sign out
 - Profile setup flow redirects new users before dashboard access
 - Password visibility toggle on auth form
@@ -64,11 +75,11 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - POST /api/auth/logout - Logout
 - GET /api/auth/me - Current user
 - PATCH /api/auth/profile - Update profile (fullName, phone, suburb)
-- GET /api/estates - User's estates
+- GET /api/estates - User's estates (scoped to membership)
 - POST /api/estates/join - Join estate by invite code
-- GET/POST /api/bills - Bills CRUD
-- GET/POST /api/outages - Outages CRUD
-- GET/POST /api/providers - Providers CRUD
+- GET/POST /api/bills - Bills CRUD (RLS: scoped to user's estates or personal)
+- GET/POST /api/outages - Outages CRUD (RLS: scoped to user's estates or personal)
+- GET/POST /api/providers - Providers CRUD (RLS: scoped to user's estates)
 - GET/POST /api/reviews - Reviews CRUD
 - GET /api/admin/users - All users (admin only)
 - GET/POST /api/admin/estates - All estates (admin only)
