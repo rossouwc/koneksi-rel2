@@ -38,6 +38,10 @@ export interface IStorage {
   getProvidersScoped(userId: string, estateIds: string[], estateId?: string): Promise<Provider[]>;
   createProvider(provider: InsertProvider): Promise<Provider>;
 
+  updateEstate(id: string, data: { name?: string; suburb?: string | null; city?: string | null; province?: string | null }): Promise<Estate>;
+  getEstateResidents(estateId: string): Promise<{ user: User; role: string; joinedAt: Date | null }[]>;
+  getEstateStats(estateId: string): Promise<{ residentCount: number; billCount: number; outageCount: number; providerCount: number }>;
+
   getProvider(id: string): Promise<Provider | undefined>;
   getReviews(providerId?: string): Promise<Review[]>;
   createReview(review: InsertReview): Promise<Review>;
@@ -171,6 +175,36 @@ export class DatabaseStorage implements IStorage {
   async createProvider(provider: InsertProvider): Promise<Provider> {
     const [created] = await db.insert(providers).values(provider).returning();
     return created;
+  }
+
+  async updateEstate(id: string, data: { name?: string; suburb?: string | null; city?: string | null; province?: string | null }): Promise<Estate> {
+    const [updated] = await db.update(estates).set(data).where(eq(estates.id, id)).returning();
+    return updated;
+  }
+
+  async getEstateResidents(estateId: string): Promise<{ user: User; role: string; joinedAt: Date | null }[]> {
+    const links = await db.select().from(userEstates).where(eq(userEstates.estateId, estateId));
+    const results: { user: User; role: string; joinedAt: Date | null }[] = [];
+    for (const link of links) {
+      const [user] = await db.select().from(users).where(eq(users.id, link.userId));
+      if (user) {
+        results.push({ user: { ...user, password: "" }, role: link.roleInEstate, joinedAt: link.joinedAt });
+      }
+    }
+    return results;
+  }
+
+  async getEstateStats(estateId: string): Promise<{ residentCount: number; billCount: number; outageCount: number; providerCount: number }> {
+    const links = await db.select().from(userEstates).where(eq(userEstates.estateId, estateId));
+    const estateBills = await db.select().from(bills).where(eq(bills.estateId, estateId));
+    const estateOutages = await db.select().from(outages).where(eq(outages.estateId, estateId));
+    const estateProviders = await db.select().from(providers).where(eq(providers.estateId, estateId));
+    return {
+      residentCount: links.length,
+      billCount: estateBills.length,
+      outageCount: estateOutages.length,
+      providerCount: estateProviders.length,
+    };
   }
 
   async getProvider(id: string): Promise<Provider | undefined> {

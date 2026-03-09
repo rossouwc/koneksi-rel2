@@ -349,5 +349,55 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/estates/:id", requireAdmin, async (req, res) => {
+    try {
+      const estate = await storage.getEstate(req.params.id);
+      if (!estate) return res.status(404).json({ message: "Estate not found" });
+      const stats = await storage.getEstateStats(estate.id);
+      res.json({ ...estate, ...stats });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/admin/estates/:id", requireAdmin, async (req, res) => {
+    try {
+      const existing = await storage.getEstate(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Estate not found" });
+      const { name, suburb, city, province } = req.body;
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json({ message: "Estate name is required" });
+      }
+      const updated = await storage.updateEstate(req.params.id, { name: name.trim(), suburb, city, province });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/admin/estates/:id/residents", requireAdmin, async (req, res) => {
+    try {
+      const residents = await storage.getEstateResidents(req.params.id);
+      res.json(residents);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/admin/estates-with-stats", requireAdmin, async (_req, res) => {
+    try {
+      const allEstates = await storage.getAllEstates();
+      const results = await Promise.all(
+        allEstates.map(async (estate) => {
+          const stats = await storage.getEstateStats(estate.id);
+          return { ...estate, ...stats };
+        })
+      );
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   return httpServer;
 }
