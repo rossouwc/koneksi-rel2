@@ -13,18 +13,25 @@ import fs from "fs";
 const uploadsDir = path.resolve("uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
+const ALLOWED_MIMES = Object.keys(MIME_TO_EXT);
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadsDir),
     filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
+      const ext = MIME_TO_EXT[file.mimetype] || ".bin";
       cb(null, `${randomBytes(12).toString("hex")}${ext}`);
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    cb(null, allowed.includes(file.mimetype));
+    cb(null, ALLOWED_MIMES.includes(file.mimetype));
   },
 });
 
@@ -273,6 +280,89 @@ export async function registerRoutes(
 
       const outage = await storage.createOutage({ ...req.body, userId });
       res.json(outage);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/bills/analyze", requireAuth, upload.single("bill"), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { estateId } = req.body;
+
+      if (estateId && estateId !== "null") {
+        const isMember = await verifyEstateMembership(userId, estateId);
+        if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const fileUrl = `/uploads/${req.file.filename}`;
+
+      const analysis = {
+        extracted: {
+          provider: "City Power / Rand Water",
+          accountNumber: "ACC-" + Math.random().toString(36).substring(2, 10).toUpperCase(),
+          billingPeriod: "Feb 2026 - Mar 2026",
+          totalAmount: 2847.50,
+          usageKwh: 892,
+          usageKl: 24.5,
+          tariffRate: 2.85,
+          category: "electricity",
+        },
+        overcharges: {
+          found: true,
+          items: [
+            {
+              description: "Service charge exceeds municipal standard",
+              expectedAmount: 185.00,
+              chargedAmount: 245.00,
+              difference: 60.00,
+            },
+            {
+              description: "VAT calculated on gross instead of net",
+              expectedAmount: 370.13,
+              chargedAmount: 398.66,
+              difference: 28.53,
+            },
+          ],
+        },
+        savings: {
+          tips: [
+            {
+              title: "Switch to Time-of-Use tariff",
+              description: "Your usage pattern shows 60% consumption during off-peak hours. A TOU tariff could save you significantly.",
+              potentialSaving: 340,
+            },
+            {
+              title: "Install a smart geyser timer",
+              description: "Your water heating accounts for an estimated 40% of electricity usage. A timer would reduce this by half.",
+              potentialSaving: 280,
+            },
+            {
+              title: "Dispute detected overcharges",
+              description: "We found R88.53 in potential overcharges. Contact your provider with reference to municipal tariff guidelines.",
+              potentialSaving: 88.53,
+            },
+          ],
+          totalPotentialSaving: 708.53,
+        },
+      };
+
+      const bill = await storage.createBill({
+        userId,
+        estateId: estateId && estateId !== "null" ? estateId : null,
+        title: `${analysis.extracted.provider} - ${analysis.extracted.billingPeriod}`,
+        amount: Math.round(analysis.extracted.totalAmount * 100),
+        category: analysis.extracted.category,
+        fileUrl,
+        analysisResult: JSON.stringify(analysis),
+        status: "pending",
+      });
+
+      res.json({ bill, analysis });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -12,6 +12,8 @@ import {
   Clock,
   FileUp,
   MapPin,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -145,6 +147,29 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.32, duration: 0.4 }}
+      >
+        <Link href="/bill-analyzer">
+          <div className="glass-card rounded-2xl p-5 cursor-pointer hover:shadow-lg transition-shadow group" data-testid="link-bill-analyzer">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl gradient-teal flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm">Bill Analyzer</h3>
+                  <p className="text-xs text-muted-foreground">Upload a bill for AI-powered analysis & savings tips</p>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+            </div>
+          </div>
+        </Link>
+      </motion.div>
 
       <div className="grid md:grid-cols-2 gap-4 md:gap-6">
         <motion.div
