@@ -14,7 +14,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `server/db.ts` - PostgreSQL connection pool
 - `server/storage.ts` - Database storage layer (IStorage interface with RLS-style scoped queries)
 - `server/routes.ts` - Express API routes with session auth + estate membership verification
-- `server/seed.ts` - Seed data for demo (admin@koneksi.app / admin123, demo@koneksi.app / demo123)
+- `server/seed.ts` - Seed data for demo (admin@koneksi.app / admin123, demo@koneksi.app / demo123, supplier@koneksi.app / supplier123)
 - `client/src/lib/auth.tsx` - Auth context provider (useAuth hook)
 - `client/src/lib/theme.tsx` - Dark/light theme provider with system preference detection
 - `client/src/lib/estate-context.tsx` - Multi-tenant estate context with localStorage persistence
@@ -36,8 +36,11 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - **user_estates** - junction table (userId, estateId, roleInEstate)
 - **bills** - userId, estateId, title, amount (cents), dueDate, category, status
 - **outages** - userId, estateId, type (electricity/water/internet/gas/other), title, description, status
-- **providers** - estateId, name, category, phone, email, website, description
+- **providers** - estateId, createdBy, name, category, phone, whatsapp, email, website, description
 - **reviews** - providerId, userId, rating, comment
+- **subscriptionTiers** - id, name, monthlyPrice (cents), maxEstates, scopeType (estate/city/province/national), description, sortOrder
+- **providerSubscriptions** - id, providerId, tierId, status (active/paused/canceled/free), selectedCity, selectedProvince, payfastToken, startedAt, nextBillingDate
+- **providerVisibleEstates** - id, providerId, estateId (junction for Free/Local tier estate visibility)
 
 ## Pages
 - Auth page (login/register) with Google OAuth button (placeholder), password reset link, glassmorphic forms
@@ -49,6 +52,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `/join-estate` - Join estate via invite code + view current estates + create estate (admin only)
 - `/bill-analyzer` - AI-powered bill analysis: drag-drop/camera upload, hardcoded sample analysis, results cards (extracted data, overcharges, savings tips), saves to bills table
 - `/alerts` - Outage alerts with Leaflet map view, list view, FAB to report, photo upload, type filtering, polling
+- `/supplier` - Supplier portal: dashboard with mock analytics (views, clicks, inquiries), tier display, upgrade flow with 5-tier pricing cards, estate/city/province selection, PayFast payment initiation, confetti on upgrade
 - `/admin` - Super admin portal with DataTable views, estate detail sub-view, create/edit dialogs (requires super_admin role)
 
 ## Key UI Features
@@ -87,6 +91,14 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - GET/POST /api/reviews - Reviews CRUD (scoped to user's accessible providers)
 - POST /api/bills/analyze - Upload bill image + get AI analysis (multipart FormData, hardcoded sample response)
 - POST /api/outages/report - Report outage with photo upload (multipart FormData, multer)
+- GET /api/supplier/dashboard - Supplier's providers with subscription/tier info, reviews, analytics (supplier role only)
+- GET /api/supplier/tiers - All subscription tiers (authenticated)
+- GET /api/supplier/estates - All estates for estate picker (supplier role only)
+- GET /api/supplier/cities - Distinct cities from estates (supplier role only)
+- GET /api/supplier/provinces - Distinct provinces from estates (supplier role only)
+- POST /api/supplier/provider - Create provider linked to supplier user (supplier role only)
+- POST /api/supplier/subscribe - Subscribe/upgrade provider to a tier (supplier role only)
+- POST /api/payfast-webhook - PayFast ITN handler for subscription activation/cancellation
 - GET /api/admin/users - All users (admin only)
 - GET/POST /api/admin/estates - All estates CRUD (admin only)
 - GET /api/admin/estates-with-stats - All estates with resident/bill/outage/provider counts

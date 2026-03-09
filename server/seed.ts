@@ -71,5 +71,47 @@ export async function seedDatabase() {
   await storage.createReview({ providerId: gardener.id, userId: demo.id, rating: 5, comment: "Our garden has never looked better. Highly recommend!" });
   await storage.createReview({ providerId: security.id, userId: demo.id, rating: 4, comment: "Quick response times and professional guards." });
 
+  const existingSupplier = await storage.getUserByEmail("supplier@koneksi.app");
+  if (!existingSupplier) {
+    const supplierPassword = await hashPassword("supplier123");
+    const supplier = await storage.createUser({
+      email: "supplier@koneksi.app",
+      password: supplierPassword,
+      fullName: "Mike's Plumbing",
+    });
+    await db.update(users).set({ role: "supplier", profileComplete: true, phone: "011 987 6543", suburb: "Randburg" }).where(eq(users.id, supplier.id));
+
+    const supplierProvider = await storage.createProvider({
+      name: "Mike's Premium Plumbing",
+      category: "plumber",
+      phone: "011 987 6543",
+      whatsapp: "+27119876543",
+      email: "mike@plumbing.co.za",
+      website: "https://mikesplumbing.co.za",
+      description: "Expert plumbing services for estates across Gauteng. 15 years experience.",
+      createdBy: supplier.id,
+      estateId: null,
+    });
+
+    const { subscriptionTiers: subTiersTable } = await import("@shared/schema");
+    const freeTiers = await db.select().from(subTiersTable).where(eq(subTiersTable.name, "Free"));
+    if (freeTiers.length > 0) {
+      const { providerSubscriptions: provSubTable } = await import("@shared/schema");
+      await db.insert(provSubTable).values({
+        providerId: supplierProvider.id,
+        tierId: freeTiers[0].id,
+        status: "free",
+      });
+
+      const { providerVisibleEstates: pveTable } = await import("@shared/schema");
+      await db.insert(pveTable).values({
+        providerId: supplierProvider.id,
+        estateId: estate1.id,
+      });
+    }
+
+    await storage.createReview({ providerId: supplierProvider.id, userId: demo.id, rating: 5, comment: "Mike's team is incredible. Fast, professional, and affordable!" });
+  }
+
   console.log("Database seeded successfully");
 }

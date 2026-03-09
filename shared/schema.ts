@@ -72,6 +72,7 @@ export const outages = pgTable("outages", {
 export const providers = pgTable("providers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   estateId: varchar("estate_id"),
+  createdBy: varchar("created_by"),
   name: text("name").notNull(),
   category: text("category").notNull(),
   phone: text("phone"),
@@ -91,6 +92,34 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const subscriptionTiers = pgTable("subscription_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  monthlyPrice: integer("monthly_price").notNull(),
+  maxEstates: integer("max_estates"),
+  scopeType: text("scope_type").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0),
+});
+
+export const providerSubscriptions = pgTable("provider_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").notNull(),
+  tierId: varchar("tier_id").notNull(),
+  status: text("status").default("free"),
+  selectedCity: text("selected_city"),
+  selectedProvince: text("selected_province"),
+  payfastToken: text("payfast_token"),
+  startedAt: timestamp("started_at").defaultNow(),
+  nextBillingDate: text("next_billing_date"),
+});
+
+export const providerVisibleEstates = pgTable("provider_visible_estates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").notNull(),
+  estateId: varchar("estate_id").notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, isSuperAdmin: true, profileComplete: true, role: true });
 export const insertEstateSchema = createInsertSchema(estates).omit({ id: true, createdAt: true, inviteCode: true });
 export const insertUserEstateSchema = createInsertSchema(userEstates).omit({ id: true, joinedAt: true });
@@ -98,6 +127,9 @@ export const insertBillSchema = createInsertSchema(bills).omit({ id: true, creat
 export const insertOutageSchema = createInsertSchema(outages).omit({ id: true, createdAt: true });
 export const insertProviderSchema = createInsertSchema(providers).omit({ id: true, createdAt: true });
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
+export const insertSubscriptionTierSchema = createInsertSchema(subscriptionTiers).omit({ id: true });
+export const insertProviderSubscriptionSchema = createInsertSchema(providerSubscriptions).omit({ id: true, startedAt: true });
+export const insertProviderVisibleEstateSchema = createInsertSchema(providerVisibleEstates).omit({ id: true });
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -130,3 +162,9 @@ export type Provider = typeof providers.$inferSelect;
 export type InsertProvider = z.infer<typeof insertProviderSchema>;
 export type Review = typeof reviews.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
+export type SubscriptionTier = typeof subscriptionTiers.$inferSelect;
+export type InsertSubscriptionTier = z.infer<typeof insertSubscriptionTierSchema>;
+export type ProviderSubscription = typeof providerSubscriptions.$inferSelect;
+export type InsertProviderSubscription = z.infer<typeof insertProviderSubscriptionSchema>;
+export type ProviderVisibleEstate = typeof providerVisibleEstates.$inferSelect;
+export type InsertProviderVisibleEstate = z.infer<typeof insertProviderVisibleEstateSchema>;

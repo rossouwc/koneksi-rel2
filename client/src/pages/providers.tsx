@@ -20,6 +20,7 @@ import {
   ExternalLink,
   User,
   Clock,
+  Crown,
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Button } from "@/components/ui/button";
@@ -402,18 +403,29 @@ function ProviderDetail({
   );
 }
 
+const tierBadgeColors: Record<string, string> = {
+  Local: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  City: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
+  Province: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+  National: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+};
+
 function ProviderCard({
   provider,
   reviews,
   avgRating,
   onClick,
+  tierName,
 }: {
   provider: Provider;
   reviews: Review[];
   avgRating: number;
   onClick: () => void;
+  tierName?: string;
 }) {
   const icon = categoryIcons[provider.category.toLowerCase()] || "📋";
+  const isPremium = tierName && tierName !== "Free";
+  const badgeColor = tierName ? tierBadgeColors[tierName] : "";
 
   return (
     <motion.div
@@ -423,19 +435,32 @@ function ProviderCard({
       transition={{ duration: 0.2 }}
     >
       <div
-        className="glass-card rounded-xl p-5 cursor-pointer hover:shadow-lg transition-shadow"
+        className={`glass-card rounded-xl p-5 cursor-pointer hover:shadow-lg transition-shadow ${isPremium ? "ring-1 ring-amber-500/20" : ""}`}
         onClick={onClick}
         data-testid={`provider-card-${provider.id}`}
       >
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-11 h-11 rounded-xl gradient-teal-subtle flex items-center justify-center text-lg flex-shrink-0">
+          <div className="w-11 h-11 rounded-xl gradient-teal-subtle flex items-center justify-center text-lg flex-shrink-0 relative">
             {icon}
+            {isPremium && (
+              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center" data-testid={`badge-premium-${provider.id}`}>
+                <Crown className="w-2.5 h-2.5 text-white" />
+              </div>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-sm truncate">{provider.name}</h3>
-            <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize mt-0.5">
-              {provider.category}
-            </span>
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize">
+                {provider.category}
+              </span>
+              {isPremium && tierName && (
+                <span className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full border font-semibold ${badgeColor}`} data-testid={`tier-badge-${provider.id}`}>
+                  <Crown className="w-2 h-2" />
+                  {tierName}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
             <StarRating rating={Math.round(avgRating)} />
@@ -568,7 +593,7 @@ export default function ProvidersPage() {
   };
 
   const filtered = useMemo(() => {
-    return providers.filter((p) => {
+    const result = providers.filter((p) => {
       const matchesSearch =
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -580,6 +605,16 @@ export default function ProvidersPage() {
       const matchesRating = ratingFilter === "all" || avg >= parseInt(ratingFilter);
 
       return matchesSearch && matchesCategory && matchesRating;
+    });
+
+    const tierPriority: Record<string, number> = { National: 5, Province: 4, City: 3, Local: 2, Free: 1 };
+    return result.sort((a, b) => {
+      const aTier = (a as any)._tierName || "";
+      const bTier = (b as any)._tierName || "";
+      const aPriority = tierPriority[aTier] || 0;
+      const bPriority = tierPriority[bTier] || 0;
+      if (bPriority !== aPriority) return bPriority - aPriority;
+      return getAverageRating(b.id) - getAverageRating(a.id);
     });
   }, [providers, searchQuery, categoryFilter, ratingFilter, allReviews]);
 
@@ -792,6 +827,7 @@ export default function ProvidersPage() {
                 reviews={reviews}
                 avgRating={avgRating}
                 onClick={() => setSelectedProviderId(provider.id)}
+                tierName={(provider as any)._tierName || undefined}
               />
             );
           })}

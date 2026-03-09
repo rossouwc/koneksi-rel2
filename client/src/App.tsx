@@ -16,6 +16,7 @@ import ProvidersPage from "@/pages/providers";
 import AdminPage from "@/pages/admin";
 import AlertsPage from "@/pages/alerts";
 import BillAnalyzerPage from "@/pages/bill-analyzer";
+import SupplierPortalPage from "@/pages/supplier-portal";
 import JoinEstatePage from "@/pages/join-estate";
 import NotFound from "@/pages/not-found";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,6 +53,7 @@ function AppContent() {
           <Route path="/providers" component={ProvidersPage} />
           <Route path="/alerts" component={AlertsPage} />
           <Route path="/bill-analyzer" component={BillAnalyzerPage} />
+          <Route path="/supplier" component={SupplierPortalPage} />
           <Route path="/admin" component={AdminPage} />
           <Route path="/join-estate" component={JoinEstatePage} />
           <Route component={NotFound} />

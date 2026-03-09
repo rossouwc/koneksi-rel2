@@ -6,10 +6,14 @@ import {
   type Outage, type InsertOutage,
   type Provider, type InsertProvider,
   type Review, type InsertReview,
+  type SubscriptionTier,
+  type ProviderSubscription, type InsertProviderSubscription,
+  type ProviderVisibleEstate,
   users, estates, userEstates, bills, outages, providers, reviews,
+  subscriptionTiers, providerSubscriptions, providerVisibleEstates,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, isNull, or, inArray } from "drizzle-orm";
+import { eq, and, desc, isNull, or, inArray, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -45,6 +49,17 @@ export interface IStorage {
   getProvider(id: string): Promise<Provider | undefined>;
   getReviews(providerId?: string): Promise<Review[]>;
   createReview(review: InsertReview): Promise<Review>;
+
+  getSubscriptionTiers(): Promise<SubscriptionTier[]>;
+  getProviderSubscription(providerId: string): Promise<ProviderSubscription | undefined>;
+  upsertProviderSubscription(sub: InsertProviderSubscription): Promise<ProviderSubscription>;
+  updateProviderSubscription(id: string, data: Partial<ProviderSubscription>): Promise<ProviderSubscription>;
+  getProviderVisibleEstates(providerId: string): Promise<ProviderVisibleEstate[]>;
+  setProviderVisibleEstates(providerId: string, estateIds: string[]): Promise<void>;
+  getProvidersByUserId(userId: string): Promise<Provider[]>;
+  getVisibleProviders(estateId: string): Promise<Provider[]>;
+  getDistinctCities(): Promise<string[]>;
+  getDistinctProvinces(): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -222,6 +237,111 @@ export class DatabaseStorage implements IStorage {
   async createReview(review: InsertReview): Promise<Review> {
     const [created] = await db.insert(reviews).values(review).returning();
     return created;
+  }
+
+  async getSubscriptionTiers(): Promise<SubscriptionTier[]> {
+    return db.select().from(subscriptionTiers).orderBy(subscriptionTiers.sortOrder);
+  }
+
+  async getProviderSubscription(providerId: string): Promise<ProviderSubscription | undefined> {
+    const [sub] = await db.select().from(providerSubscriptions).where(eq(providerSubscriptions.providerId, providerId));
+    return sub;
+  }
+
+  async upsertProviderSubscription(sub: InsertProviderSubscription): Promise<ProviderSubscription> {
+    const existing = await this.getProviderSubscription(sub.providerId);
+    if (existing) {
+      const [updated] = await db.update(providerSubscriptions)
+        .set(sub)
+        .where(eq(providerSubscriptions.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(providerSubscriptions).values(sub).returning();
+    return created;
+  }
+
+  async updateProviderSubscription(id: string, data: Partial<ProviderSubscription>): Promise<ProviderSubscription> {
+    const [updated] = await db.update(providerSubscriptions).set(data).where(eq(providerSubscriptions.id, id)).returning();
+    return updated;
+  }
+
+  async getProviderVisibleEstates(providerId: string): Promise<ProviderVisibleEstate[]> {
+    return db.select().from(providerVisibleEstates).where(eq(providerVisibleEstates.providerId, providerId));
+  }
+
+  async setProviderVisibleEstates(providerId: string, estateIds: string[]): Promise<void> {
+    await db.delete(providerVisibleEstates).where(eq(providerVisibleEstates.providerId, providerId));
+    if (estateIds.length > 0) {
+      await db.insert(providerVisibleEstates).values(
+        estateIds.map((estateId) => ({ providerId, estateId }))
+      );
+    }
+  }
+
+  async getProvidersByUserId(userId: string): Promise<Provider[]> {
+    return db.select().from(providers).where(eq(providers.createdBy, userId)).orderBy(desc(providers.createdAt));
+  }
+
+  async getVisibleProviders(estateId: string): Promise<Provider[]> {
+    const estate = await this.getEstate(estateId);
+    if (!estate) return [];
+
+    const directProviders = await db.select().from(providers).where(eq(providers.estateId, estateId));
+
+    const visibleLinks = await db.select().from(providerVisibleEstates).where(eq(providerVisibleEstates.estateId, estateId));
+    const visibleProviderIds = visibleLinks.map((v) => v.providerId);
+
+    let linkedProviders: Provider[] = [];
+    if (visibleProviderIds.length > 0) {
+      linkedProviders = await db.select().from(providers).where(inArray(providers.id, visibleProviderIds));
+    }
+
+    const allSubs = await db.select().from(providerSubscriptions).where(eq(providerSubscriptions.status, "active"));
+
+    const nationalProviderIds: string[] = [];
+    const cityProviderIds: string[] = [];
+    const provinceProviderIds: string[] = [];
+
+    for (const sub of allSubs) {
+      const tier = await db.select().from(subscriptionTiers).where(eq(subscriptionTiers.id, sub.tierId));
+      if (!tier[0]) continue;
+      const scopeType = tier[0].scopeType;
+
+      if (scopeType === "national") {
+        nationalProviderIds.push(sub.providerId);
+      } else if (scopeType === "city" && sub.selectedCity && estate.city &&
+        sub.selectedCity.toLowerCase() === estate.city.toLowerCase()) {
+        cityProviderIds.push(sub.providerId);
+      } else if (scopeType === "province" && sub.selectedProvince && estate.province &&
+        sub.selectedProvince.toLowerCase() === estate.province.toLowerCase()) {
+        provinceProviderIds.push(sub.providerId);
+      }
+    }
+
+    const scopedIds = [...nationalProviderIds, ...provinceProviderIds, ...cityProviderIds];
+    let scopedProviders: Provider[] = [];
+    if (scopedIds.length > 0) {
+      scopedProviders = await db.select().from(providers).where(inArray(providers.id, scopedIds));
+    }
+
+    const allProviders = [...directProviders, ...linkedProviders, ...scopedProviders];
+    const seen = new Set<string>();
+    return allProviders.filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  }
+
+  async getDistinctCities(): Promise<string[]> {
+    const result = await db.selectDistinct({ city: estates.city }).from(estates);
+    return result.map((r) => r.city).filter(Boolean) as string[];
+  }
+
+  async getDistinctProvinces(): Promise<string[]> {
+    const result = await db.selectDistinct({ province: estates.province }).from(estates);
+    return result.map((r) => r.province).filter(Boolean) as string[];
   }
 }
 
