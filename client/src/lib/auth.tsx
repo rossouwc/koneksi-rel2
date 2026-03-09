@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await apiRequest("POST", "/api/auth/login", { email, password });
     },
     onSuccess: () => {
+      queryClient.clear();
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
   });
@@ -63,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await apiRequest("POST", "/api/auth/register", data);
     },
     onSuccess: () => {
+      queryClient.clear();
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
   });
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
+      queryClient.clear();
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
   });

@@ -64,11 +64,9 @@ function ResidentAppInner() {
     );
   }
 
-  if (
-    user?.role === "estate_admin" &&
-    estates.length > 0 &&
-    estates.every((e) => e.approvalStatus !== "approved")
-  ) {
+  const hasApprovedEstate = estates.some((e) => e.approvalStatus === "approved");
+
+  if (user?.role === "estate_admin" && !hasApprovedEstate) {
     return <PendingEstateApprovalPage estates={estates} />;
   }
 
