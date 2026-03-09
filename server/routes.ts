@@ -428,6 +428,27 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/providers/:id", requireAuth, async (req, res) => {
+    try {
+      const provider = await storage.getProvider(req.params.id);
+      if (!provider) return res.status(404).json({ message: "Provider not found" });
+      if (provider.estateId) {
+        const isMember = await verifyEstateMembership(req.session.userId!, provider.estateId);
+        if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+      }
+      const reviews = await storage.getReviews(provider.id);
+      const reviewsWithUsers = await Promise.all(
+        reviews.map(async (r) => {
+          const user = await storage.getUser(r.userId);
+          return { ...r, user: user ? { fullName: user.fullName } : null };
+        })
+      );
+      res.json({ provider, reviews: reviewsWithUsers });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/providers", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
@@ -438,7 +459,12 @@ export async function registerRoutes(
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
       }
 
-      const provider = await storage.createProvider(req.body);
+      const { website, ...rest } = req.body;
+      let safeWebsite = website || null;
+      if (safeWebsite && !/^https?:\/\//i.test(safeWebsite)) {
+        safeWebsite = `https://${safeWebsite}`;
+      }
+      const provider = await storage.createProvider({ ...rest, website: safeWebsite });
       res.json(provider);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -447,16 +473,23 @@ export async function registerRoutes(
 
   app.get("/api/reviews", requireAuth, async (req, res) => {
     try {
+      const userId = req.session.userId!;
       const providerId = req.query.providerId as string | undefined;
       if (providerId) {
         const provider = await storage.getProvider(providerId);
         if (provider?.estateId) {
-          const isMember = await verifyEstateMembership(req.session.userId!, provider.estateId);
+          const isMember = await verifyEstateMembership(userId, provider.estateId);
           if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
         }
+        const reviews = await storage.getReviews(providerId);
+        return res.json(reviews);
       }
-      const reviews = await storage.getReviews(providerId);
-      res.json(reviews);
+      const memberEstateIds = await getUserEstateIds(userId);
+      const providers = await storage.getProvidersScoped(userId, memberEstateIds);
+      const providerIds = providers.map((p) => p.id);
+      const allReviews = await storage.getReviews();
+      const scopedReviews = allReviews.filter((r) => providerIds.includes(r.providerId));
+      res.json(scopedReviews);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

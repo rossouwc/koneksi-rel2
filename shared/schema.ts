@@ -75,6 +75,7 @@ export const providers = pgTable("providers", {
   name: text("name").notNull(),
   category: text("category").notNull(),
   phone: text("phone"),
+  whatsapp: text("whatsapp"),
   email: text("email"),
   website: text("website"),
   description: text("description"),
