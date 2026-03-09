@@ -397,6 +397,178 @@ function getServiceColor(service: string) {
   return serviceBadgeColors[Math.abs(hash) % serviceBadgeColors.length];
 }
 
+function PendingEstates() {
+  const { toast } = useToast();
+  const [confirmAction, setConfirmAction] = useState<{ id: string; name: string; action: "approve" | "reject" } | null>(null);
+
+  const { data: pendingEstates = [], isLoading, isError, refetch } = useQuery<Estate[]>({
+    queryKey: ["/api/admin/pending-estates"],
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/admin/estates/${id}/approve`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-estates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/estates-with-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/estates"] });
+      setConfirmAction(null);
+      toast({ title: "Estate approved", description: "The estate admin can now access their estate" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/admin/estates/${id}/reject`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-estates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/estates-with-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/estates"] });
+      setConfirmAction(null);
+      toast({ title: "Estate rejected" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="glass-card rounded-xl p-12 text-center">
+        <X className="w-12 h-12 mx-auto text-red-400/50 mb-3" />
+        <h3 className="font-semibold mb-1">Failed to load pending estates</h3>
+        <p className="text-sm text-muted-foreground mb-3">Something went wrong while fetching the data</p>
+        <Button variant="outline" className="rounded-xl" onClick={() => refetch()} data-testid="button-retry-pending-estates">
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  if (pendingEstates.length === 0) {
+    return (
+      <div className="glass-card rounded-xl p-8 text-center">
+        <CheckCircle2 className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+        <h3 className="font-semibold mb-1 text-sm">No pending estate approvals</h3>
+        <p className="text-xs text-muted-foreground">All estate applications have been reviewed</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="glass-card rounded-xl overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Estate Name</TableHead>
+              <TableHead className="hidden sm:table-cell">Location</TableHead>
+              <TableHead className="hidden sm:table-cell">Submitted</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pendingEstates.map((estate) => (
+              <TableRow key={estate.id} data-testid={`pending-estate-row-${estate.id}`}>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-primary flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-sm">{estate.name}</p>
+                      <p className="text-xs text-muted-foreground sm:hidden">
+                        {[estate.streetName, estate.suburb, estate.city].filter(Boolean).join(", ") || "—"}
+                      </p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground hidden sm:table-cell">
+                  {[estate.streetName, estate.suburb, estate.city, estate.province].filter(Boolean).join(", ") || "—"}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">
+                  {estate.createdAt ? new Date(estate.createdAt).toLocaleDateString("en-ZA") : "—"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      size="sm"
+                      className="rounded-lg text-xs gradient-teal text-white h-8 px-3"
+                      onClick={() => setConfirmAction({ id: estate.id, name: estate.name, action: "approve" })}
+                      data-testid={`button-approve-estate-${estate.id}`}
+                    >
+                      <Check className="w-3.5 h-3.5 mr-1" />
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-lg text-xs h-8 px-3 text-red-500 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                      onClick={() => setConfirmAction({ id: estate.id, name: estate.name, action: "reject" })}
+                      data-testid={`button-reject-estate-${estate.id}`}
+                    >
+                      <X className="w-3.5 h-3.5 mr-1" />
+                      Reject
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Dialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {confirmAction?.action === "approve" ? "Approve Estate?" : "Reject Estate?"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {confirmAction?.action === "approve"
+              ? `This will activate "${confirmAction?.name}" and allow the estate admin to access it.`
+              : `This will decline "${confirmAction?.name}". The estate admin will be notified.`}
+          </p>
+          <div className="flex gap-2 justify-end mt-2">
+            <Button variant="outline" className="rounded-xl" onClick={() => setConfirmAction(null)} data-testid="button-cancel-estate-action">
+              Cancel
+            </Button>
+            <Button
+              className={`rounded-xl text-white ${confirmAction?.action === "approve" ? "gradient-teal" : "bg-red-500 hover:bg-red-600"}`}
+              onClick={() => {
+                if (!confirmAction) return;
+                if (confirmAction.action === "approve") {
+                  approveMutation.mutate(confirmAction.id);
+                } else {
+                  rejectMutation.mutate(confirmAction.id);
+                }
+              }}
+              disabled={approveMutation.isPending || rejectMutation.isPending}
+              data-testid="button-confirm-estate-action"
+            >
+              {approveMutation.isPending || rejectMutation.isPending ? "Processing..." : confirmAction?.action === "approve" ? "Approve" : "Reject"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function PendingSuppliers() {
   const { toast } = useToast();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -1016,8 +1188,17 @@ export default function AdminPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="approvals" className="mt-4 space-y-4">
+        <TabsContent value="approvals" className="mt-4 space-y-6">
           <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2 mb-1">
+              <Building2 className="w-5 h-5 text-primary" />
+              Pending Estate Approvals
+            </h2>
+            <p className="text-sm text-muted-foreground">Review and approve or reject new estate registrations</p>
+          </div>
+          <PendingEstates />
+
+          <div className="pt-2">
             <h2 className="text-lg font-semibold flex items-center gap-2 mb-1">
               <ClipboardCheck className="w-5 h-5 text-primary" />
               Pending Supplier Approvals

@@ -27,9 +27,11 @@ import SupplierBillingPage from "@/pages/supplier-billing";
 import MarketplacePage from "@/pages/marketplace";
 import JoinEstatePage from "@/pages/join-estate";
 import PendingApprovalPage from "@/pages/pending-approval";
+import PendingEstateApprovalPage from "@/pages/pending-estate-approval";
 import ResidentOnlyPage from "@/pages/resident-only";
 import NotFound from "@/pages/not-found";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEstate } from "@/lib/estate-context";
 
 function SupplierApp() {
   return (
@@ -47,23 +49,51 @@ function SupplierApp() {
   );
 }
 
+function ResidentAppInner() {
+  const { user } = useAuth();
+  const { estates, isLoading: estatesLoading } = useEstate();
+
+  if (estatesLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="space-y-4 text-center">
+          <div className="w-12 h-12 mx-auto rounded-xl gradient-teal animate-pulse" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    user?.role === "estate_admin" &&
+    estates.length > 0 &&
+    estates.every((e) => e.approvalStatus !== "approved")
+  ) {
+    return <PendingEstateApprovalPage estates={estates} />;
+  }
+
+  return (
+    <Layout>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/bills" component={BillsPage} />
+        <Route path="/outages" component={OutagesPage} />
+        <Route path="/providers" component={ProvidersPage} />
+        <Route path="/alerts" component={AlertsPage} />
+        <Route path="/bill-analyzer" component={BillAnalyzerPage} />
+        <Route path="/marketplace" component={MarketplacePage} />
+        <Route path="/admin" component={AdminPage} />
+        <Route path="/join-estate" component={JoinEstatePage} />
+        <Route component={NotFound} />
+      </Switch>
+    </Layout>
+  );
+}
+
 function ResidentApp() {
   return (
     <EstateProvider>
-      <Layout>
-        <Switch>
-          <Route path="/" component={Dashboard} />
-          <Route path="/bills" component={BillsPage} />
-          <Route path="/outages" component={OutagesPage} />
-          <Route path="/providers" component={ProvidersPage} />
-          <Route path="/alerts" component={AlertsPage} />
-          <Route path="/bill-analyzer" component={BillAnalyzerPage} />
-          <Route path="/marketplace" component={MarketplacePage} />
-          <Route path="/admin" component={AdminPage} />
-          <Route path="/join-estate" component={JoinEstatePage} />
-          <Route component={NotFound} />
-        </Switch>
-      </Layout>
+      <ResidentAppInner />
     </EstateProvider>
   );
 }

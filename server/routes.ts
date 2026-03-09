@@ -107,12 +107,29 @@ export async function registerRoutes(
   }
 
   async function getUserEstateIds(userId: string): Promise<string[]> {
-    return storage.getUserEstateIds(userId);
+    const allIds = await storage.getUserEstateIds(userId);
+    const approvedIds: string[] = [];
+    for (const id of allIds) {
+      const estate = await storage.getEstate(id);
+      if (estate && estate.approvalStatus === "approved") {
+        approvedIds.push(id);
+      }
+    }
+    return approvedIds;
   }
 
   async function verifyEstateMembership(userId: string, estateId: string): Promise<boolean> {
     const link = await storage.getUserEstateLink(userId, estateId);
     return !!link;
+  }
+
+  async function requireApprovedEstate(estateId: string): Promise<{ approved: boolean; message?: string }> {
+    const estate = await storage.getEstate(estateId);
+    if (!estate) return { approved: false, message: "Estate not found" };
+    if (estate.approvalStatus !== "approved") {
+      return { approved: false, message: "This estate is pending approval and cannot be used yet" };
+    }
+    return { approved: true };
   }
 
   app.post("/api/auth/register", async (req, res) => {
@@ -278,6 +295,9 @@ export async function registerRoutes(
       if (!estate) {
         return res.status(404).json({ message: "Invalid invite code" });
       }
+      if (estate.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "This estate is pending admin approval and cannot accept new members yet" });
+      }
       const existing = await storage.getUserEstateLink(req.session.userId!, estate.id);
       if (existing) {
         return res.status(400).json({ message: "Already a member of this estate" });
@@ -314,6 +334,8 @@ export async function registerRoutes(
       if (estateId) {
         const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+        const check = await requireApprovedEstate(estateId);
+        if (!check.approved) return res.status(403).json({ message: check.message });
       }
 
       const bill = await storage.createBill({ ...req.body, userId });
@@ -348,6 +370,8 @@ export async function registerRoutes(
       if (estateId) {
         const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+        const check = await requireApprovedEstate(estateId);
+        if (!check.approved) return res.status(403).json({ message: check.message });
       }
 
       const outage = await storage.createOutage({ ...req.body, userId });
@@ -365,6 +389,8 @@ export async function registerRoutes(
       if (estateId && estateId !== "null") {
         const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+        const check = await requireApprovedEstate(estateId);
+        if (!check.approved) return res.status(403).json({ message: check.message });
       }
 
       if (!req.file) {
@@ -506,6 +532,8 @@ export async function registerRoutes(
       if (estateId) {
         const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+        const check = await requireApprovedEstate(estateId);
+        if (!check.approved) return res.status(403).json({ message: check.message });
       }
 
       const { website, ...rest } = req.body;
@@ -1010,6 +1038,44 @@ export async function registerRoutes(
       }
       await db.update(users).set({ approvalStatus: "rejected" }).where(eq(users.id, supplier.id));
       res.json({ message: "Supplier rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/admin/pending-estates", requireAdmin, async (_req, res) => {
+    try {
+      const allEstates = await storage.getAllEstates();
+      const pending = allEstates.filter((e) => e.approvalStatus === "pending");
+      res.json(pending);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/admin/estates/:id/approve", requireAdmin, async (req, res) => {
+    try {
+      const estate = await storage.getEstate(req.params.id);
+      if (!estate) return res.status(404).json({ message: "Estate not found" });
+      if (estate.approvalStatus !== "pending") {
+        return res.status(409).json({ message: `Estate is already ${estate.approvalStatus}` });
+      }
+      await db.update(estates).set({ approvalStatus: "approved" }).where(eq(estates.id, estate.id));
+      res.json({ message: "Estate approved" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/admin/estates/:id/reject", requireAdmin, async (req, res) => {
+    try {
+      const estate = await storage.getEstate(req.params.id);
+      if (!estate) return res.status(404).json({ message: "Estate not found" });
+      if (estate.approvalStatus !== "pending") {
+        return res.status(409).json({ message: `Estate is already ${estate.approvalStatus}` });
+      }
+      await db.update(estates).set({ approvalStatus: "rejected" }).where(eq(estates.id, estate.id));
+      res.json({ message: "Estate rejected" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

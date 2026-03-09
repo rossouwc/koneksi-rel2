@@ -43,7 +43,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - **users** - id, email, password, fullName, phone, suburb, avatarUrl, role (user_role enum), profileComplete, isSuperAdmin, businessName, businessWebsite, services (text[]), approvalStatus
   - role enum: resident, estate_admin, super_admin, supplier
   - approvalStatus: null (default for residents), "pending" (supplier awaiting review), "approved", "rejected"
-- **estates** - id, name, streetName, suburb, city, province, inviteCode (auto-generated 8-char uppercase)
+- **estates** - id, name, streetName, suburb, city, province, inviteCode (auto-generated 8-char uppercase), approvalStatus (pending/approved/rejected, default pending)
 - **user_estates** - junction table (userId, estateId, roleInEstate)
 - **bills** - userId, estateId, title, amount (cents), dueDate, category, status
 - **outages** - userId, estateId, type (electricity/water/internet/gas/other), title, description, status
@@ -127,5 +127,8 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - GET/POST /api/admin/estates - All estates CRUD (admin only)
 - GET /api/admin/estates-with-stats - All estates with resident/bill/outage/provider counts
 - GET /api/admin/estates/:id - Single estate detail with stats
-- PATCH /api/admin/estates/:id - Update estate (name, suburb, city, province)
+- PATCH /api/admin/estates/:id - Update estate (name, streetName, suburb, city, province)
+- GET /api/admin/pending-estates - All estates with approvalStatus=pending (admin only)
+- PATCH /api/admin/estates/:id/approve - Approve pending estate (admin only)
+- PATCH /api/admin/estates/:id/reject - Reject pending estate (admin only)
 - GET /api/admin/estates/:id/residents - List estate residents with roles and join dates

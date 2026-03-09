@@ -34,6 +34,7 @@ export const estates = pgTable("estates", {
   city: text("city"),
   province: text("province"),
   inviteCode: text("invite_code").notNull().unique(),
+  approvalStatus: text("approval_status").default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
