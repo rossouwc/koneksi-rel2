@@ -15,6 +15,7 @@ interface SupplierRegistrationData {
 interface EstateRegistrationData {
   registerAs: "estate_admin";
   estateName: string;
+  estateStreetName?: string;
   estateSuburb?: string;
   estateCity?: string;
   estateProvince?: string;

@@ -117,7 +117,7 @@ export async function registerRoutes(
 
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { email, password, fullName, registerAs, businessName, businessWebsite, services, phone, contactEmail, estateName, estateSuburb, estateCity, estateProvince } = req.body;
+      const { email, password, fullName, registerAs, businessName, businessWebsite, services, phone, contactEmail, estateName, estateStreetName, estateSuburb, estateCity, estateProvince } = req.body;
       if (!email || !password || !fullName) {
         return res.status(400).json({ message: "Missing required fields" });
       }
@@ -175,6 +175,7 @@ export async function registerRoutes(
           const inviteCode = (await import("crypto")).randomUUID().slice(0, 8).toUpperCase();
           const [estate] = await tx.insert(estates).values({
             name: estateName,
+            streetName: estateStreetName || null,
             suburb: estateSuburb || null,
             city: estateCity || null,
             province: estateProvince || null,
@@ -935,11 +936,11 @@ export async function registerRoutes(
     try {
       const existing = await storage.getEstate(req.params.id);
       if (!existing) return res.status(404).json({ message: "Estate not found" });
-      const { name, suburb, city, province } = req.body;
+      const { name, streetName, suburb, city, province } = req.body;
       if (!name || typeof name !== "string" || name.trim().length === 0) {
         return res.status(400).json({ message: "Estate name is required" });
       }
-      const updated = await storage.updateEstate(req.params.id, { name: name.trim(), suburb, city, province });
+      const updated = await storage.updateEstate(req.params.id, { name: name.trim(), streetName, suburb, city, province });
       res.json(updated);
     } catch (err: any) {
       res.status(500).json({ message: err.message });

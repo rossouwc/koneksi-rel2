@@ -80,6 +80,7 @@ function EstateFormDialog({
 }) {
   const { toast } = useToast();
   const [name, setName] = useState(estate?.name || "");
+  const [streetName, setStreetName] = useState(estate?.streetName || "");
   const [suburb, setSuburb] = useState(estate?.suburb || "");
   const [city, setCity] = useState(estate?.city || "");
   const [province, setProvince] = useState(estate?.province || "");
@@ -112,6 +113,7 @@ function EstateFormDialog({
     e.preventDefault();
     mutation.mutate({
       name,
+      streetName: streetName || null,
       suburb: suburb || null,
       city: city || null,
       province: province || null,
@@ -137,6 +139,16 @@ function EstateFormDialog({
               placeholder="e.g. Greenwood Estate"
               className="rounded-xl mt-1.5"
               required
+            />
+          </div>
+          <div>
+            <Label className="text-sm">Street Name</Label>
+            <Input
+              data-testid="input-estate-dialog-street-name"
+              value={streetName}
+              onChange={(e) => setStreetName(e.target.value)}
+              placeholder="e.g. 12 Oak Avenue"
+              className="rounded-xl mt-1.5"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -251,7 +263,7 @@ function EstateDetail({ estateId, onBack }: { estateId: string; onBack: () => vo
           <h1 className="text-2xl font-bold" data-testid="text-estate-detail-name">{estate.name}</h1>
           <p className="text-muted-foreground text-sm flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5" />
-            {[estate.suburb, estate.city, estate.province].filter(Boolean).join(", ") || "No location set"}
+            {[estate.streetName, estate.suburb, estate.city, estate.province].filter(Boolean).join(", ") || "No location set"}
           </p>
         </div>
         <Button

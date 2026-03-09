@@ -42,6 +42,7 @@ export default function AuthPage() {
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
 
   const [estateName, setEstateName] = useState("");
+  const [estateStreetName, setEstateStreetName] = useState("");
   const [estateSuburb, setEstateSuburb] = useState("");
   const [estateCity, setEstateCity] = useState("");
   const [estateProvince, setEstateProvince] = useState("");
@@ -108,6 +109,7 @@ export default function AuthPage() {
         await register(email, password, fullName, {
           registerAs: "estate_admin",
           estateName: estateName.trim(),
+          estateStreetName: estateStreetName.trim() || undefined,
           estateSuburb: estateSuburb.trim() || undefined,
           estateCity: estateCity.trim() || undefined,
           estateProvince: estateProvince || undefined,
@@ -323,6 +325,20 @@ export default function AuthPage() {
                         placeholder="e.g. Greenwood Estate"
                         className={inputClass}
                         required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-white/90 text-sm mb-1.5 block">Street Name</Label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <Input
+                        data-testid="input-estate-street-name"
+                        value={estateStreetName}
+                        onChange={(e) => setEstateStreetName(e.target.value)}
+                        placeholder="e.g. 12 Oak Avenue"
+                        className={inputClass}
                       />
                     </div>
                   </div>

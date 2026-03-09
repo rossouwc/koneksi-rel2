@@ -43,7 +43,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - **users** - id, email, password, fullName, phone, suburb, avatarUrl, role (user_role enum), profileComplete, isSuperAdmin, businessName, businessWebsite, services (text[]), approvalStatus
   - role enum: resident, estate_admin, super_admin, supplier
   - approvalStatus: null (default for residents), "pending" (supplier awaiting review), "approved", "rejected"
-- **estates** - id, name, suburb, city, province, inviteCode (auto-generated 8-char uppercase)
+- **estates** - id, name, streetName, suburb, city, province, inviteCode (auto-generated 8-char uppercase)
 - **user_estates** - junction table (userId, estateId, roleInEstate)
 - **bills** - userId, estateId, title, amount (cents), dueDate, category, status
 - **outages** - userId, estateId, type (electricity/water/internet/gas/other), title, description, status

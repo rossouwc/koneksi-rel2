@@ -29,6 +29,7 @@ export const users = pgTable("users", {
 export const estates = pgTable("estates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  streetName: text("street_name"),
   suburb: text("suburb"),
   city: text("city"),
   province: text("province"),
