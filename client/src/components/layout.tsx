@@ -19,6 +19,7 @@ import {
   ChevronDown,
   UserCircle,
   Plus,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +37,7 @@ const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/bills", label: "Bills", icon: Receipt },
   { path: "/outages", label: "Outages", icon: Zap },
+  { path: "/alerts", label: "Alerts", icon: Bell },
   { path: "/providers", label: "Providers", icon: Store },
 ];
 

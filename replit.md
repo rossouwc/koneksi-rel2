@@ -47,6 +47,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `/outages` - Outage reporting and tracking
 - `/providers` - Service providers directory with reviews
 - `/join-estate` - Join estate via invite code + view current estates + create estate (admin only)
+- `/alerts` - Outage alerts with Leaflet map view, list view, FAB to report, photo upload, type filtering, polling
 - `/admin` - Super admin portal with DataTable views, estate detail sub-view, create/edit dialogs (requires super_admin role)
 
 ## Key UI Features
@@ -81,6 +82,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - GET/POST /api/outages - Outages CRUD (RLS: scoped to user's estates or personal)
 - GET/POST /api/providers - Providers CRUD (RLS: scoped to user's estates)
 - GET/POST /api/reviews - Reviews CRUD
+- POST /api/outages/report - Report outage with photo upload (multipart FormData, multer)
 - GET /api/admin/users - All users (admin only)
 - GET/POST /api/admin/estates - All estates CRUD (admin only)
 - GET /api/admin/estates-with-stats - All estates with resident/bill/outage/provider counts

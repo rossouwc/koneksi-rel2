@@ -65,6 +65,7 @@ export const outages = pgTable("outages", {
   lat: text("lat"),
   lng: text("lng"),
   address: text("address"),
+  photoUrl: text("photo_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

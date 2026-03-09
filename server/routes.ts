@@ -1,10 +1,32 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import connectPgSimple from "connect-pg-simple";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadsDir = path.resolve("uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `${randomBytes(12).toString("hex")}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    cb(null, allowed.includes(file.mimetype));
+  },
+});
 
 const scryptAsync = promisify(scrypt);
 
@@ -51,6 +73,8 @@ export async function registerRoutes(
       },
     })
   );
+
+  app.use("/uploads", express.static(uploadsDir));
 
   function requireAuth(req: any, res: any, next: any) {
     if (!req.session.userId) {
@@ -248,6 +272,49 @@ export async function registerRoutes(
       }
 
       const outage = await storage.createOutage({ ...req.body, userId });
+      res.json(outage);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/outages/report", requireAuth, upload.single("photo"), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { type, title, description, address, lat, lng, estateId } = req.body;
+
+      const validTypes = ["electricity", "water", "internet", "gas", "other"];
+      if (!type || !validTypes.includes(type)) {
+        return res.status(400).json({ message: "Invalid outage type" });
+      }
+      if (!title || typeof title !== "string" || title.trim().length === 0) {
+        return res.status(400).json({ message: "Title is required" });
+      }
+      if (lat && isNaN(parseFloat(lat))) {
+        return res.status(400).json({ message: "Invalid latitude" });
+      }
+      if (lng && isNaN(parseFloat(lng))) {
+        return res.status(400).json({ message: "Invalid longitude" });
+      }
+
+      if (estateId && estateId !== "null") {
+        const isMember = await verifyEstateMembership(userId, estateId);
+        if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+      }
+
+      const photoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+      const outage = await storage.createOutage({
+        userId,
+        estateId: estateId && estateId !== "null" ? estateId : null,
+        type: type as any,
+        title: title.trim(),
+        description: description?.trim() || null,
+        address: address?.trim() || null,
+        lat: lat || null,
+        lng: lng || null,
+        photoUrl,
+      });
       res.json(outage);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
