@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/hooks/use-subscription";
-import { useSupplierProfile } from "@/hooks/use-supplier-profile";
 import confetti from "canvas-confetti";
 import {
   Crown,
@@ -23,19 +22,12 @@ import {
   Shield,
   Zap,
   Clock,
-  Pencil,
   X,
-  ExternalLink,
-  Mail,
-  Globe,
-  ChevronDown,
-  Briefcase,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -51,7 +43,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SERVICE_OPTIONS } from "@shared/schema";
 import type { SubscriptionTier, Estate } from "@shared/schema";
 
 const providerCategories = [
@@ -100,334 +91,6 @@ interface SupplierProvider {
 interface DashboardData {
   providers: SupplierProvider[];
   tiers: SubscriptionTier[];
-}
-
-function SupplierProfileCard() {
-  const { profile, isLoading, updateProfile } = useSupplierProfile();
-  const { toast } = useToast();
-  const [editing, setEditing] = useState(false);
-  const [editBusinessName, setEditBusinessName] = useState("");
-  const [editWebsite, setEditWebsite] = useState("");
-  const [editPhone, setEditPhone] = useState("");
-  const [editServices, setEditServices] = useState<string[]>([]);
-  const [customService, setCustomService] = useState("");
-  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
-
-  const startEditing = () => {
-    if (!profile) return;
-    setEditBusinessName(profile.businessName || "");
-    setEditWebsite(profile.businessWebsite || "");
-    setEditPhone(profile.phone || "");
-    setEditServices(profile.services || []);
-    setEditing(true);
-  };
-
-  const handleSave = () => {
-    setShowServiceDropdown(false);
-    if (!editBusinessName.trim()) {
-      toast({ title: "Error", description: "Business name is required", variant: "destructive" });
-      return;
-    }
-    if (editServices.length === 0) {
-      toast({ title: "Error", description: "At least one service is required", variant: "destructive" });
-      return;
-    }
-    updateProfile.mutate(
-      {
-        businessName: editBusinessName.trim(),
-        businessWebsite: editWebsite.trim() || null,
-        phone: editPhone.trim(),
-        services: editServices,
-      },
-      {
-        onSuccess: () => {
-          toast({ title: "Profile updated" });
-          setEditing(false);
-        },
-        onError: (err: any) => {
-          toast({ title: "Error", description: err.message, variant: "destructive" });
-        },
-      }
-    );
-  };
-
-  const toggleService = (service: string) => {
-    setEditServices((prev) =>
-      prev.includes(service) ? prev.filter((s) => s !== service) : [...prev, service]
-    );
-  };
-
-  const addCustomService = () => {
-    const trimmed = customService.trim();
-    if (trimmed && !editServices.includes(trimmed)) {
-      setEditServices((prev) => [...prev, trimmed]);
-      setCustomService("");
-    }
-  };
-
-  if (isLoading) {
-    return <Skeleton className="h-48 rounded-2xl" />;
-  }
-
-  if (!profile) return null;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="glass-card rounded-2xl overflow-hidden"
-    >
-      <div className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl gradient-teal flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base" data-testid="text-profile-business-name">
-                {profile.businessName || profile.fullName}
-              </h3>
-              <p className="text-xs text-muted-foreground">{profile.email}</p>
-            </div>
-          </div>
-          {!editing && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={startEditing}
-              data-testid="button-edit-profile"
-              className="rounded-xl gap-1.5 text-xs bg-gradient-to-r from-teal-500 to-emerald-500 text-white border-0 hover:from-teal-400 hover:to-emerald-400 hover:text-white"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit Profile
-            </Button>
-          )}
-        </div>
-
-        <AnimatePresence mode="wait">
-          {!editing ? (
-            <motion.div
-              key="view"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-3"
-            >
-              {profile.businessWebsite && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Globe className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <a
-                    href={profile.businessWebsite}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-testid="link-profile-website"
-                    className="text-primary hover:underline flex items-center gap-1 truncate"
-                  >
-                    {profile.businessWebsite.replace(/^https?:\/\//, "")}
-                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                  </a>
-                </div>
-              )}
-
-              {profile.phone && (
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <span data-testid="text-profile-phone">{profile.phone}</span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span data-testid="text-profile-email">{profile.email}</span>
-              </div>
-
-              {profile.services && profile.services.length > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1.5">Services</p>
-                  <div className="flex flex-wrap gap-1.5" data-testid="container-profile-services">
-                    {profile.services.map((service) => (
-                      <Badge
-                        key={service}
-                        data-testid={`badge-profile-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
-                        variant="secondary"
-                        className="text-xs px-2.5 py-0.5 rounded-full"
-                      >
-                        {service}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="edit"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-4"
-            >
-              <div>
-                <Label className="text-sm mb-1.5 block">
-                  Business Name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  data-testid="input-edit-business-name"
-                  value={editBusinessName}
-                  onChange={(e) => setEditBusinessName(e.target.value)}
-                  placeholder="Your business name"
-                  className="rounded-lg"
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm mb-1.5 block">Website</Label>
-                <Input
-                  data-testid="input-edit-website"
-                  value={editWebsite}
-                  onChange={(e) => setEditWebsite(e.target.value)}
-                  placeholder="https://yourbusiness.co.za"
-                  className="rounded-lg"
-                  type="url"
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm mb-1.5 block">Phone</Label>
-                <Input
-                  data-testid="input-edit-phone"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  placeholder="082 123 4567"
-                  className="rounded-lg"
-                  type="tel"
-                />
-              </div>
-
-              <div>
-                <Label className="text-sm mb-1.5 block">
-                  Services <span className="text-red-500">*</span>
-                </Label>
-
-                {editServices.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {editServices.map((service) => (
-                      <Badge
-                        key={service}
-                        data-testid={`badge-edit-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
-                        className="bg-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-400/30 hover:bg-teal-500/30 cursor-pointer gap-1 py-1 px-2"
-                        onClick={() => toggleService(service)}
-                      >
-                        {service}
-                        <X className="w-3 h-3" />
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-
-                <div className="relative">
-                  <button
-                    type="button"
-                    data-testid="button-edit-services-dropdown"
-                    onClick={() => setShowServiceDropdown(!showServiceDropdown)}
-                    className="w-full flex items-center justify-between py-2.5 px-3 bg-muted/50 border border-border rounded-lg text-sm hover:bg-muted/70 transition-all"
-                  >
-                    <span className="text-muted-foreground">
-                      {editServices.length === 0 ? "Select services..." : `${editServices.length} selected`}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showServiceDropdown ? "rotate-180" : ""}`} />
-                  </button>
-
-                  <AnimatePresence>
-                    {showServiceDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute z-50 w-full mt-1 rounded-xl overflow-hidden max-h-48 overflow-y-auto bg-popover border border-border shadow-lg"
-                      >
-                        {SERVICE_OPTIONS.map((service) => (
-                          <button
-                            key={service}
-                            type="button"
-                            data-testid={`option-edit-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
-                            onClick={() => toggleService(service)}
-                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                              editServices.includes(service)
-                                ? "bg-primary/10 text-primary"
-                                : "text-foreground hover:bg-muted"
-                            }`}
-                          >
-                            <span className="flex items-center gap-2">
-                              <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${
-                                editServices.includes(service)
-                                  ? "bg-primary border-primary text-primary-foreground"
-                                  : "border-muted-foreground/30"
-                              }`}>
-                                {editServices.includes(service) && "✓"}
-                              </span>
-                              {service}
-                            </span>
-                          </button>
-                        ))}
-
-                        <div className="p-2 border-t border-border">
-                          <div className="flex gap-1.5">
-                            <Input
-                              data-testid="input-edit-custom-service"
-                              value={customService}
-                              onChange={(e) => setCustomService(e.target.value)}
-                              placeholder="Other service..."
-                              className="flex-1 h-8 rounded-lg text-xs"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  addCustomService();
-                                }
-                              }}
-                            />
-                            <Button
-                              type="button"
-                              data-testid="button-edit-add-custom-service"
-                              onClick={addCustomService}
-                              size="sm"
-                              className="h-8 px-3 rounded-lg text-xs gradient-teal text-white"
-                            >
-                              Add
-                            </Button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button
-                  onClick={handleSave}
-                  disabled={updateProfile.isPending}
-                  data-testid="button-save-profile"
-                  className="flex-1 rounded-xl gradient-teal text-white"
-                >
-                  {updateProfile.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setEditing(false)}
-                  data-testid="button-cancel-edit"
-                  className="rounded-xl"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
-  );
 }
 
 function CreateProviderForm({ onSuccess }: { onSuccess: () => void }) {
@@ -874,9 +537,9 @@ export default function SupplierPortalPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-supplier-heading">Supplier Portal</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-supplier-heading">Overview</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Manage your business profile, listings and visibility
+            Manage your listings and visibility
           </p>
         </div>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -894,8 +557,6 @@ export default function SupplierPortalPage() {
           </DialogContent>
         </Dialog>
       </div>
-
-      <SupplierProfileCard />
 
       {providers.length === 0 ? (
         <motion.div

@@ -11,7 +11,6 @@ import {
   Store,
   ShoppingBag,
   Shield,
-  Crown,
   Menu,
   X,
   Sun,
@@ -135,11 +134,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const isAdmin = user?.isSuperAdmin || user?.role === "super_admin";
-  const isSupplier = user?.role === "supplier";
 
   const allNavItems = [
     ...navItems,
-    ...(isSupplier ? [{ path: "/supplier", label: "Supplier Portal", icon: Crown }] : []),
     { path: "/join-estate", label: "Estates", icon: Building2 },
   ];
 
@@ -190,21 +187,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
-              {isSupplier && (
-                <Link href="/supplier">
-                  <button
-                    data-testid="nav-supplier"
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      location === "/supplier"
-                        ? "gradient-teal-subtle text-primary"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    <Crown className="w-4 h-4" />
-                    Supplier
-                  </button>
-                </Link>
-              )}
               {isAdmin && (
                 <Link href="/admin">
                   <button

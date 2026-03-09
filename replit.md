@@ -28,6 +28,8 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `client/src/hooks/use-bill-analysis.ts` - useBillAnalysis hook (file upload → OpenAI analysis → save)
 - `client/src/hooks/use-subscription.ts` - useSubscription hook (tier subscribe/upgrade → PayFast redirect)
 - `client/src/hooks/use-supplier-profile.ts` - useSupplierProfile hook (GET/PATCH /api/supplier/profile, profile card + edit)
+- `client/src/components/supplier-layout.tsx` - Isolated supplier layout with bottom tabs (Overview, Profile, Calendar, Bookings, Analytics, Billing), avatar dropdown, deeper teal gradient accent
+- `client/src/pages/supplier-billing.tsx` - Billing page fetches tiers from /api/supplier/dashboard (monthlyPrice in cents, display as R{price/100})
 
 ## Multi-Tenant Architecture
 - Estate selector in header with "Personal" option (no estate) + all user's estates
@@ -62,8 +64,13 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `/bill-analyzer` - AI-powered bill analysis: drag-drop/camera upload, hardcoded sample analysis, results cards (extracted data, overcharges, savings tips), saves to bills table
 - `/alerts` - Outage alerts with Leaflet map view, list view, FAB to report, photo upload, type filtering, polling
 - `/marketplace` - Product marketplace: responsive grid of estate/home products (water tanks, solar gear, security, etc.), category chips, search, product cards with images/pricing/badges, "View Deal" affiliate buttons
-- `/supplier` - Supplier portal: dashboard with mock analytics (views, clicks, inquiries), tier display, upgrade flow with 5-tier pricing cards, estate/city/province selection, PayFast payment initiation, confetti on upgrade
-- `/admin` - Super admin portal with DataTable views, estate detail sub-view, create/edit dialogs (requires super_admin role)
+- `/supplier` - Supplier portal overview: business listings dashboard, create listing dialog, tier pricing preview, upgrade flow with PayFast payment, confetti on upgrade
+- `/supplier/profile` - Standalone supplier profile editor (business name, services, website, phone)
+- `/supplier/calendar` - Calendar & availability management
+- `/supplier/bookings` - Bookings & inquiries tracker (pending/confirmed/completed stats)
+- `/supplier/analytics` - Analytics dashboard (profile views, clicks, inquiries, charts)
+- `/supplier/billing` - Subscription & billing: current plan display, 5-tier pricing cards, upgrade/downgrade buttons
+- `/admin` - Super admin portal with DataTable views, estate detail sub-view, create/edit dialogs, supplier approvals tab (requires super_admin role)
 
 ## Key UI Features
 - Estate selector dropdown with "Personal" + estates + "+" button to join/manage estates
