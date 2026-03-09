@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
+import { usePortal } from "@/lib/portal-context";
 import {
   LayoutDashboard,
   UserCircle,
@@ -15,6 +16,8 @@ import {
   Moon,
   ChevronDown,
   Briefcase,
+  Building2,
+  ArrowRightLeft,
 } from "lucide-react";
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 
@@ -30,6 +33,7 @@ const supplierNavItems = [
 function SupplierAvatarDropdown() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { isDualRole, switchToEstate } = usePortal();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -75,6 +79,16 @@ function SupplierAvatarDropdown() {
               </span>
             </div>
             <div className="py-1">
+              {isDualRole && (
+                <button
+                  data-testid="button-switch-to-estate"
+                  onClick={() => { switchToEstate(); setOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
+                >
+                  <Building2 className="w-4 h-4" />
+                  Switch to Estate View
+                </button>
+              )}
               <button
                 data-testid="button-supplier-theme"
                 onClick={() => { toggleTheme(); setOpen(false); }}

@@ -30,6 +30,9 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `client/src/hooks/use-bill-analysis.ts` - useBillAnalysis hook (file upload → OpenAI analysis → save)
 - `client/src/hooks/use-subscription.ts` - useSubscription hook (tier subscribe/upgrade → PayFast redirect)
 - `client/src/hooks/use-supplier-profile.ts` - useSupplierProfile hook (GET/PATCH /api/supplier/profile, profile card + edit)
+- `client/src/lib/portal-context.tsx` - Dual-role portal switcher (supplier + estate_admin users can switch between portals)
+  - URL-synced: portalMode derived from pathname (/supplier/* = supplier, else estate)
+  - Supplier layout shows "Switch to Estate View", resident layout shows "Switch to Supplier Portal"
 - `client/src/components/supplier-layout.tsx` - Isolated supplier layout with bottom tabs (Overview, Profile, Calendar, Bookings, Analytics, Billing), avatar dropdown, deeper teal gradient accent
 - `client/src/pages/supplier-billing.tsx` - Billing page fetches tiers from /api/supplier/dashboard (monthlyPrice in cents, display as R{price/100})
 

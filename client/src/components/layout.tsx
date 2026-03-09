@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useEstate } from "@/lib/estate-context";
 import { useTheme } from "@/lib/theme";
+import { usePortal } from "@/lib/portal-context";
 import {
   LayoutDashboard,
   Receipt,
@@ -21,6 +22,7 @@ import {
   UserCircle,
   Plus,
   Bell,
+  Briefcase,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +48,7 @@ const navItems = [
 function AvatarDropdown() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { isDualRole, switchToSupplier } = usePortal();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -101,6 +104,16 @@ function AvatarDropdown() {
             </div>
 
             <div className="py-1">
+              {isDualRole && (
+                <button
+                  data-testid="button-switch-to-supplier"
+                  onClick={() => { switchToSupplier(); setOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  Switch to Supplier Portal
+                </button>
+              )}
               <button
                 data-testid="button-dropdown-theme"
                 onClick={() => { toggleTheme(); setOpen(false); }}
