@@ -31,6 +31,7 @@ import {
   X,
   Briefcase,
   Clock,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -931,6 +932,7 @@ export default function AdminPage() {
   const [selectedEstateId, setSelectedEstateId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editEstate, setEditEstate] = useState<Estate | null>(null);
+  const [deleteEstate, setDeleteEstate] = useState<EstateWithStats | null>(null);
   const [search, setSearch] = useState("");
 
   const isAdmin = user?.isSuperAdmin || user?.role === "super_admin";
@@ -950,6 +952,21 @@ export default function AdminPage() {
     enabled: !!isAdmin,
   });
 
+  const deleteEstateMutation = useMutation({
+    mutationFn: async (estateId: string) => {
+      await apiRequest("DELETE", `/api/admin/estates/${estateId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/estates-with-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Estate deleted", description: "The estate and all associated data have been removed. Linked users can continue as personal users." });
+      setDeleteEstate(null);
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   if (!isAdmin) {
     return (
       <div className="text-center py-20">
@@ -967,7 +984,9 @@ export default function AdminPage() {
     return <EstateDetail estateId={selectedEstateId} onBack={() => setSelectedEstateId(null)} />;
   }
 
-  const filteredEstates = estatesWithStats.filter((e) =>
+  const approvedEstates = estatesWithStats.filter((e) => e.approvalStatus === "approved");
+
+  const filteredEstates = approvedEstates.filter((e) =>
     [e.name, e.suburb, e.city, e.province].some((f) => f?.toLowerCase().includes(search.toLowerCase()))
   );
 
@@ -986,8 +1005,8 @@ export default function AdminPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: "Total Users", value: allUsers.length, icon: Users, color: "bg-teal-600" },
-          { label: "Estates", value: estatesWithStats.length, icon: Building2, color: "bg-emerald-500" },
-          { label: "Providers", value: estatesWithStats.reduce((s, e) => s + e.providerCount, 0), icon: Store, color: "bg-blue-500" },
+          { label: "Estates", value: approvedEstates.length, icon: Building2, color: "bg-emerald-500" },
+          { label: "Providers", value: approvedEstates.reduce((s, e) => s + e.providerCount, 0), icon: Store, color: "bg-blue-500" },
           { label: "Pending", value: pendingCount.length, icon: ClipboardCheck, color: "bg-amber-500" },
         ].map((stat, i) => (
           <motion.div
@@ -1120,6 +1139,15 @@ export default function AdminPage() {
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-lg h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteEstate(estate)}
+                            data-testid={`button-delete-estate-${estate.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1217,6 +1245,33 @@ export default function AdminPage() {
           estate={editEstate}
         />
       )}
+
+      <Dialog open={!!deleteEstate} onOpenChange={(open) => { if (!open) setDeleteEstate(null); }}>
+        <DialogContent className="glass-card border-border/40" data-testid="dialog-delete-estate">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Delete Estate
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <span className="font-semibold text-foreground">{deleteEstate?.name}</span>? This will permanently remove the estate and all its associated data (bills, outages, providers). Users linked to this estate will be unlinked and can continue as personal users.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDeleteEstate(null)} data-testid="button-cancel-delete-estate">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteEstate && deleteEstateMutation.mutate(deleteEstate.id)}
+              disabled={deleteEstateMutation.isPending}
+              data-testid="button-confirm-delete-estate"
+            >
+              {deleteEstateMutation.isPending ? "Deleting..." : "Delete Estate"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -12,8 +12,8 @@ import fs from "fs";
 import { analyzeBillImage } from "./openai-bill-analyzer";
 import { buildPayFastUrl, validatePayFastITN } from "./payfast";
 import { db } from "./db";
-import { users, estates, userEstates } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, estates, userEstates, bills, outages, providers, reviews, providerVisibleEstates } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
 
 const uploadsDir = path.resolve("uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -1038,6 +1038,33 @@ export async function registerRoutes(
       }
       await db.update(users).set({ approvalStatus: "rejected" }).where(eq(users.id, supplier.id));
       res.json({ message: "Supplier rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/admin/estates/:id", requireAdmin, async (req, res) => {
+    try {
+      const estate = await storage.getEstate(req.params.id);
+      if (!estate) return res.status(404).json({ message: "Estate not found" });
+
+      await db.transaction(async (tx) => {
+        const estateProviders = await tx.select({ id: providers.id }).from(providers).where(eq(providers.estateId, estate.id));
+        const providerIds = estateProviders.map((p) => p.id);
+
+        if (providerIds.length > 0) {
+          await tx.delete(reviews).where(sql`${reviews.providerId} IN ${sql.raw(`('${providerIds.join("','")}')`)}`)
+          await tx.delete(providerVisibleEstates).where(sql`${providerVisibleEstates.providerId} IN ${sql.raw(`('${providerIds.join("','")}')`)}`)
+        }
+        await tx.delete(providerVisibleEstates).where(eq(providerVisibleEstates.estateId, estate.id));
+        await tx.delete(providers).where(eq(providers.estateId, estate.id));
+        await tx.delete(bills).where(eq(bills.estateId, estate.id));
+        await tx.delete(outages).where(eq(outages.estateId, estate.id));
+        await tx.delete(userEstates).where(eq(userEstates.estateId, estate.id));
+        await tx.delete(estates).where(eq(estates.id, estate.id));
+      });
+
+      res.json({ message: "Estate deleted" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
