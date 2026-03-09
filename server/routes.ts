@@ -1149,14 +1149,26 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/suppliers", requireAdmin, async (_req, res) => {
+    try {
+      const allUsersData = await storage.getAllUsers();
+      const suppliers = allUsersData
+        .filter((u) => u.role === "supplier")
+        .map((u) => ({ ...u, password: undefined }));
+      res.json(suppliers);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.patch("/api/admin/suppliers/:id/approve", requireAdmin, async (req, res) => {
     try {
       const supplier = await storage.getUser(req.params.id);
       if (!supplier) return res.status(404).json({ message: "Supplier not found" });
       if (supplier.role !== "supplier") return res.status(400).json({ message: "User is not a supplier" });
 
-      if (supplier.approvalStatus !== "pending") {
-        return res.status(409).json({ message: `Supplier is already ${supplier.approvalStatus}` });
+      if (supplier.approvalStatus === "approved") {
+        return res.status(409).json({ message: "Supplier is already approved" });
       }
       await db.update(users).set({ approvalStatus: "approved" }).where(eq(users.id, supplier.id));
       res.json({ message: "Supplier approved" });
@@ -1171,8 +1183,8 @@ export async function registerRoutes(
       if (!supplier) return res.status(404).json({ message: "Supplier not found" });
       if (supplier.role !== "supplier") return res.status(400).json({ message: "User is not a supplier" });
 
-      if (supplier.approvalStatus !== "pending") {
-        return res.status(409).json({ message: `Supplier is already ${supplier.approvalStatus}` });
+      if (supplier.approvalStatus === "rejected") {
+        return res.status(409).json({ message: "Supplier is already rejected" });
       }
       await db.update(users).set({ approvalStatus: "rejected" }).where(eq(users.id, supplier.id));
       res.json({ message: "Supplier rejected" });

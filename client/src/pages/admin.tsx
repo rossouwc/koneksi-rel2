@@ -570,6 +570,226 @@ function PendingEstates() {
   );
 }
 
+function AllSuppliers() {
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: suppliers = [], isLoading } = useQuery<User[]>({
+    queryKey: ["/api/admin/suppliers"],
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/admin/suppliers/${id}/approve`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Supplier approved", description: "They can now access the supplier portal" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/admin/suppliers/${id}/reject`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Supplier rejected" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const filtered = suppliers.filter((s) =>
+    [s.fullName, s.businessName, s.email, ...(s.services || [])].some((f) =>
+      f?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  );
+
+  const statusColor = (status: string | null) => {
+    if (status === "approved") return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+    if (status === "rejected") return "bg-red-500/10 text-red-600 border-red-500/20";
+    return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            data-testid="input-admin-search-suppliers"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search suppliers..."
+            className="pl-10 rounded-xl"
+          />
+        </div>
+        <Badge variant="outline" className="self-start px-3 py-1.5 rounded-lg text-xs">
+          {suppliers.length} total supplier{suppliers.length !== 1 ? "s" : ""}
+        </Badge>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="glass-card rounded-xl p-12 text-center">
+          <Briefcase className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+          <h3 className="font-semibold mb-1">
+            {suppliers.length === 0 ? "No suppliers yet" : "No matching suppliers"}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {suppliers.length === 0
+              ? "Suppliers will appear here once they register"
+              : "Try adjusting your search query"}
+          </p>
+        </div>
+      ) : (
+        <div className="glass-card rounded-xl overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border/40">
+                <TableHead className="text-xs uppercase tracking-wider">Business</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider hidden md:table-cell">Contact</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider hidden sm:table-cell">Services</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider">Status</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((supplier) => (
+                <TableRow key={supplier.id} className="border-border/40" data-testid={`row-supplier-${supplier.id}`}>
+                  <TableCell>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full gradient-teal flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {supplier.businessName?.[0]?.toUpperCase() || supplier.fullName?.[0]?.toUpperCase() || "S"}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate" data-testid={`text-supplier-name-${supplier.id}`}>
+                          {supplier.businessName || supplier.fullName}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{supplier.fullName}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <div className="space-y-0.5">
+                      <p className="text-xs flex items-center gap-1">
+                        <Mail className="w-3 h-3 text-muted-foreground" />
+                        {supplier.email}
+                      </p>
+                      {supplier.phone && (
+                        <p className="text-xs flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-muted-foreground" />
+                          {supplier.phone}
+                        </p>
+                      )}
+                      {supplier.businessWebsite && (
+                        <a
+                          href={supplier.businessWebsite}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <Globe className="w-3 h-3" />
+                          Website
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <div className="flex flex-wrap gap-1">
+                      {(supplier.services || []).slice(0, 2).map((s) => (
+                        <Badge key={s} variant="secondary" className="text-[10px] px-1.5 py-0 rounded-md">
+                          {s}
+                        </Badge>
+                      ))}
+                      {(supplier.services || []).length > 2 && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 rounded-md">
+                          +{(supplier.services || []).length - 2}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={`text-[10px] rounded-md ${statusColor(supplier.approvalStatus)}`}>
+                      {supplier.approvalStatus || "pending"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {supplier.approvalStatus === "pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg"
+                            onClick={() => approveMutation.mutate(supplier.id)}
+                            disabled={approveMutation.isPending}
+                            data-testid={`button-approve-supplier-${supplier.id}`}
+                          >
+                            <Check className="w-3 h-3 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 rounded-lg"
+                            onClick={() => rejectMutation.mutate(supplier.id)}
+                            disabled={rejectMutation.isPending}
+                            data-testid={`button-reject-supplier-${supplier.id}`}
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      {supplier.approvalStatus === "rejected" && (
+                        <Button
+                          size="sm"
+                          className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg"
+                          onClick={() => approveMutation.mutate(supplier.id)}
+                          disabled={approveMutation.isPending}
+                          data-testid={`button-reapprove-supplier-${supplier.id}`}
+                        >
+                          <Check className="w-3 h-3 mr-1" />
+                          Approve
+                        </Button>
+                      )}
+                      {supplier.approvalStatus === "approved" && (
+                        <Badge variant="outline" className="text-[10px] bg-emerald-500/5 border-emerald-500/20 text-emerald-600 rounded-md">
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PendingSuppliers() {
   const { toast } = useToast();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -952,6 +1172,11 @@ export default function AdminPage() {
     enabled: !!isAdmin,
   });
 
+  const { data: allSuppliers = [] } = useQuery<User[]>({
+    queryKey: ["/api/admin/suppliers"],
+    enabled: !!isAdmin,
+  });
+
   const deleteEstateMutation = useMutation({
     mutationFn: async (estateId: string) => {
       await apiRequest("DELETE", `/api/admin/estates/${estateId}`);
@@ -1006,7 +1231,7 @@ export default function AdminPage() {
         {[
           { label: "Total Users", value: allUsers.length, icon: Users, color: "bg-teal-600" },
           { label: "Estates", value: approvedEstates.length, icon: Building2, color: "bg-emerald-500" },
-          { label: "Providers", value: approvedEstates.reduce((s, e) => s + e.providerCount, 0), icon: Store, color: "bg-blue-500" },
+          { label: "Suppliers", value: allSuppliers.length, icon: Briefcase, color: "bg-blue-500" },
           { label: "Pending", value: pendingCount.length, icon: ClipboardCheck, color: "bg-amber-500" },
         ].map((stat, i) => (
           <motion.div
@@ -1037,6 +1262,10 @@ export default function AdminPage() {
           <TabsTrigger value="users" data-testid="tab-users" className="rounded-lg">
             <Users className="w-4 h-4 mr-2" />
             Users
+          </TabsTrigger>
+          <TabsTrigger value="suppliers" data-testid="tab-suppliers" className="rounded-lg">
+            <Briefcase className="w-4 h-4 mr-2" />
+            Suppliers
           </TabsTrigger>
           <TabsTrigger value="approvals" data-testid="tab-approvals" className="rounded-lg">
             <ClipboardCheck className="w-4 h-4 mr-2" />
@@ -1214,6 +1443,10 @@ export default function AdminPage() {
               </Table>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="suppliers" className="mt-4 space-y-4">
+          <AllSuppliers />
         </TabsContent>
 
         <TabsContent value="approvals" className="mt-4 space-y-6">
