@@ -15,7 +15,9 @@ import {
   MapPin,
   Sparkles,
   ArrowRight,
+  Copy,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,6 +63,7 @@ function StatCard({
 export default function Dashboard() {
   const { user } = useAuth();
   const { currentEstate } = useEstate();
+  const { toast } = useToast();
 
   const estateParam = currentEstate ? `?estateId=${currentEstate.id}` : "";
 
@@ -128,8 +131,19 @@ export default function Dashboard() {
             <h2 className="text-xl md:text-2xl font-bold text-white" data-testid="text-estate-name">
               {currentEstate.name}
             </h2>
-            <p className="text-white/60 text-xs mt-2">
+            <p className="text-white/60 text-xs mt-2 flex items-center gap-1.5">
               Invite code: <span className="font-mono bg-white/10 px-2 py-0.5 rounded">{currentEstate.inviteCode}</span>
+              <button
+                type="button"
+                data-testid="button-copy-invite-code"
+                onClick={() => {
+                  navigator.clipboard.writeText(currentEstate.inviteCode);
+                  toast({ title: "Copied!", description: "Invite code copied to clipboard." });
+                }}
+                className="text-white/50 hover:text-white transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
             </p>
           </div>
         </motion.div>
