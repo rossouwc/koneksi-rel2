@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     onSuccess: () => {
       queryClient.clear();
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      window.location.replace("/");
     },
   });
 
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     onSuccess: () => {
       queryClient.clear();
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      window.location.replace("/");
     },
   });
 
