@@ -1249,7 +1249,7 @@ export default function ProvidersPage() {
   const [recommendDialogOpen, setRecommendDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
-  const [adminTab, setAdminTab] = useState<"pending" | "browse" | "invitations">("pending");
+  const [adminTab, setAdminTab] = useState<"pending" | "browse" | "invitations" | "providers">("providers");
 
   const [recommendSearch, setRecommendSearch] = useState("");
 
@@ -1453,7 +1453,7 @@ export default function ProvidersPage() {
               : "Find service providers in your area"}
           </p>
         </div>
-        {currentEstate && (
+        {currentEstate && !isEstateAdmin && (
           <div className="flex gap-2 flex-wrap">
             <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
               <DialogTrigger asChild>
@@ -1618,157 +1618,245 @@ export default function ProvidersPage() {
             </Dialog>
           </div>
         )}
+        {isEstateAdmin && currentEstate && (
+          <div className="flex gap-2 flex-wrap">
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="rounded-xl text-sm gap-1.5" data-testid="button-invite-provider">
+                  <UserPlus className="w-4 h-4" />
+                  Invite Provider
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Invite a Provider</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground -mt-1">
+                  Know a great provider not yet on Koneksi? Invite them to join and serve your estate.
+                </p>
+                <form onSubmit={handleInviteSubmit} className="space-y-4 mt-2">
+                  <div>
+                    <Label className="text-sm">Provider Name</Label>
+                    <Input
+                      data-testid="input-invite-name"
+                      value={invName}
+                      onChange={(e) => setInvName(e.target.value)}
+                      placeholder="Business or provider name"
+                      className="rounded-lg mt-1.5"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Category</Label>
+                    <Select value={invCategory} onValueChange={setInvCategory}>
+                      <SelectTrigger data-testid="select-invite-category" className="rounded-lg mt-1.5">
+                        <SelectValue placeholder="Select category (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {providerCategories.map((c) => (
+                          <SelectItem key={c} value={c.toLowerCase()}>
+                            {categoryIcons[c.toLowerCase()] || "📋"} {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Email</Label>
+                    <Input
+                      data-testid="input-invite-email"
+                      type="email"
+                      value={invEmail}
+                      onChange={(e) => setInvEmail(e.target.value)}
+                      placeholder="provider@example.com"
+                      className="rounded-lg mt-1.5"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Phone</Label>
+                    <Input
+                      data-testid="input-invite-phone"
+                      value={invPhone}
+                      onChange={(e) => setInvPhone(e.target.value)}
+                      placeholder="+27..."
+                      className="rounded-lg mt-1.5"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full rounded-xl gradient-teal text-white"
+                    disabled={inviteMutation.isPending}
+                    data-testid="button-submit-invite"
+                  >
+                    {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
       </div>
 
       {isEstateAdmin && currentEstate && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card rounded-2xl p-4"
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <Shield className="w-4 h-4 text-primary" />
-            <h2 className="font-semibold text-sm">Admin Management</h2>
-          </div>
-
-          <div className="flex gap-1 mb-4 bg-muted/30 rounded-xl p-1">
-            <button
-              onClick={() => setAdminTab("pending")}
-              className={`flex-1 text-xs py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                adminTab === "pending"
-                  ? "bg-background shadow-sm font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-testid="tab-pending-providers"
-            >
-              <Clock className="w-3 h-3" />
-              Pending
-              {pendingCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setAdminTab("browse")}
-              className={`flex-1 text-xs py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                adminTab === "browse"
-                  ? "bg-background shadow-sm font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-testid="tab-browse-providers"
-            >
-              <Search className="w-3 h-3" />
-              Browse
-            </button>
-            <button
-              onClick={() => setAdminTab("invitations")}
-              className={`flex-1 text-xs py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                adminTab === "invitations"
-                  ? "bg-background shadow-sm font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-testid="tab-invitations"
-            >
-              <Inbox className="w-3 h-3" />
-              Invites
-            </button>
-          </div>
-
-          {adminTab === "pending" && <AdminPendingTab estateId={currentEstate.id} />}
-          {adminTab === "browse" && <AdminBrowseTab estateId={currentEstate.id} />}
-          {adminTab === "invitations" && <AdminInvitationsTab estateId={currentEstate.id} />}
-        </motion.div>
+        <div className="flex gap-1 bg-muted/30 rounded-xl p-1">
+          <button
+            onClick={() => setAdminTab("providers")}
+            className={`flex-1 text-xs py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              adminTab === "providers"
+                ? "bg-background shadow-sm font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            data-testid="tab-estate-providers"
+          >
+            <Store className="w-3.5 h-3.5" />
+            Estate Providers
+          </button>
+          <button
+            onClick={() => setAdminTab("pending")}
+            className={`flex-1 text-xs py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 relative ${
+              adminTab === "pending"
+                ? "bg-background shadow-sm font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            data-testid="tab-pending-providers"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            Pending
+            {pendingCount > 0 && (
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] flex items-center justify-center font-medium">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setAdminTab("browse")}
+            className={`flex-1 text-xs py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              adminTab === "browse"
+                ? "bg-background shadow-sm font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            data-testid="tab-browse-providers"
+          >
+            <Search className="w-3.5 h-3.5" />
+            Browse & Add
+          </button>
+          <button
+            onClick={() => setAdminTab("invitations")}
+            className={`flex-1 text-xs py-2.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              adminTab === "invitations"
+                ? "bg-background shadow-sm font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            data-testid="tab-invitations"
+          >
+            <Inbox className="w-3.5 h-3.5" />
+            Invites
+          </button>
+        </div>
       )}
 
-      <div className="space-y-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            data-testid="input-provider-search"
-            placeholder="Search providers..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 rounded-xl"
-          />
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="rounded-xl w-auto min-w-[140px] h-9 text-xs" data-testid="select-filter-category">
-              <Filter className="w-3 h-3 mr-1.5" />
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {activeCategories.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {categoryIcons[c] || "📋"} {c.charAt(0).toUpperCase() + c.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <ServicesFilter selectedServices={servicesFilter} onChange={setServicesFilter} />
-
-          <Select value={ratingFilter} onValueChange={setRatingFilter}>
-            <SelectTrigger className="rounded-xl w-auto min-w-[120px] h-9 text-xs" data-testid="select-filter-rating">
-              <Star className="w-3 h-3 mr-1.5" />
-              <SelectValue placeholder="Rating" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Ratings</SelectItem>
-              <SelectItem value="4">4+ Stars</SelectItem>
-              <SelectItem value="3">3+ Stars</SelectItem>
-              <SelectItem value="2">2+ Stars</SelectItem>
-              <SelectItem value="1">1+ Stars</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 rounded-xl" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center py-16"
-        >
-          <div className="w-20 h-20 mx-auto rounded-2xl gradient-teal-subtle flex items-center justify-center mb-4">
-            <Store className="w-10 h-10 text-primary/40" />
-          </div>
-          <h3 className="text-lg font-semibold mb-1">No providers found</h3>
-          <p className="text-sm text-muted-foreground">
-            {searchQuery || categoryFilter !== "all" || ratingFilter !== "all" || servicesFilter.length > 0
-              ? "Try adjusting your filters"
-              : currentEstate
-                ? "Recommend a provider to get started"
-                : "Join an estate to see providers"}
-          </p>
-        </motion.div>
-      ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {filtered.map((provider) => {
-            const reviews = getProviderReviews(provider.id);
-            const avgRating = getAverageRating(provider.id);
-
-            return (
-              <ProviderCard
-                key={provider.id}
-                provider={provider}
-                reviews={reviews}
-                avgRating={avgRating}
-                onClick={() => setSelectedProviderId(provider.id)}
-                tierName={(provider as any)._tierName || undefined}
+      {(!isEstateAdmin || !currentEstate || adminTab === "providers") && (
+        <>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                data-testid="input-provider-search"
+                placeholder="Search providers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 rounded-xl"
               />
-            );
-          })}
-        </div>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="rounded-xl w-auto min-w-[140px] h-9 text-xs" data-testid="select-filter-category">
+                  <Filter className="w-3 h-3 mr-1.5" />
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {activeCategories.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {categoryIcons[c] || "📋"} {c.charAt(0).toUpperCase() + c.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <ServicesFilter selectedServices={servicesFilter} onChange={setServicesFilter} />
+
+              <Select value={ratingFilter} onValueChange={setRatingFilter}>
+                <SelectTrigger className="rounded-xl w-auto min-w-[120px] h-9 text-xs" data-testid="select-filter-rating">
+                  <Star className="w-3 h-3 mr-1.5" />
+                  <SelectValue placeholder="Rating" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Ratings</SelectItem>
+                  <SelectItem value="4">4+ Stars</SelectItem>
+                  <SelectItem value="3">3+ Stars</SelectItem>
+                  <SelectItem value="2">2+ Stars</SelectItem>
+                  <SelectItem value="1">1+ Stars</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-48 rounded-xl" />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-16"
+            >
+              <div className="w-20 h-20 mx-auto rounded-2xl gradient-teal-subtle flex items-center justify-center mb-4">
+                <Store className="w-10 h-10 text-primary/40" />
+              </div>
+              <h3 className="text-lg font-semibold mb-1">No providers found</h3>
+              <p className="text-sm text-muted-foreground">
+                {searchQuery || categoryFilter !== "all" || ratingFilter !== "all" || servicesFilter.length > 0
+                  ? "Try adjusting your filters"
+                  : currentEstate
+                    ? "Add providers from the Browse tab to get started"
+                    : "Join an estate to see providers"}
+              </p>
+            </motion.div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {filtered.map((provider) => {
+                const reviews = getProviderReviews(provider.id);
+                const avgRating = getAverageRating(provider.id);
+
+                return (
+                  <ProviderCard
+                    key={provider.id}
+                    provider={provider}
+                    reviews={reviews}
+                    avgRating={avgRating}
+                    onClick={() => setSelectedProviderId(provider.id)}
+                    tierName={(provider as any)._tierName || undefined}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {isEstateAdmin && currentEstate && adminTab === "pending" && (
+        <AdminPendingTab estateId={currentEstate.id} />
+      )}
+      {isEstateAdmin && currentEstate && adminTab === "browse" && (
+        <AdminBrowseTab estateId={currentEstate.id} />
+      )}
+      {isEstateAdmin && currentEstate && adminTab === "invitations" && (
+        <AdminInvitationsTab estateId={currentEstate.id} />
       )}
     </div>
   );
