@@ -783,6 +783,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: "This provider has already been recommended and is pending approval" });
       }
 
+      const tierCheck = await storage.canProviderBeAddedToEstate(providerId, estateId);
+      if (!tierCheck.allowed) {
+        return res.status(400).json({ message: tierCheck.reason || "Provider's subscription does not allow being added to this estate" });
+      }
+
       const recommendation = await storage.createProvider({
         estateId,
         createdBy: existingProvider.createdBy,
@@ -891,11 +896,14 @@ export async function registerRoutes(
       const alreadyNames = new Set(alreadyVisible.map((p) => p.name.toLowerCase()));
       const pendingInEstate = await storage.getPendingProviders(estateId);
       const pendingNames = new Set(pendingInEstate.map((p) => p.name.toLowerCase()));
-      const filtered = allProviders.filter((p) => {
+      const eligible = [];
+      for (const p of allProviders) {
         const nameLower = p.name.toLowerCase();
-        return !alreadyNames.has(nameLower) && !pendingNames.has(nameLower) && p.estateId !== estateId;
-      });
-      res.json(filtered);
+        if (alreadyNames.has(nameLower) || pendingNames.has(nameLower) || p.estateId === estateId) continue;
+        const check = await storage.canProviderBeAddedToEstate(p.id, estateId);
+        eligible.push({ ...p, _canAdd: check.allowed, _tierReason: check.reason || null, _tierName: check.tierName || null });
+      }
+      res.json(eligible);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -913,11 +921,14 @@ export async function registerRoutes(
       const alreadyNames = new Set(alreadyVisible.map((p) => p.name.toLowerCase()));
       const pendingInEstate = await storage.getPendingProviders(estateId);
       const pendingNames = new Set(pendingInEstate.map((p) => p.name.toLowerCase()));
-      const filtered = allProviders.filter((p) => {
+      const eligible = [];
+      for (const p of allProviders) {
         const nameLower = p.name.toLowerCase();
-        return !alreadyNames.has(nameLower) && !pendingNames.has(nameLower) && p.estateId !== estateId;
-      });
-      res.json(filtered);
+        if (alreadyNames.has(nameLower) || pendingNames.has(nameLower) || p.estateId === estateId) continue;
+        const check = await storage.canProviderBeAddedToEstate(p.id, estateId);
+        eligible.push({ ...p, _canAdd: check.allowed, _tierReason: check.reason || null, _tierName: check.tierName || null });
+      }
+      res.json(eligible);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -937,6 +948,10 @@ export async function registerRoutes(
       const alreadyVisible = await storage.getVisibleProviders(estateId);
       if (alreadyVisible.some((p) => p.name.toLowerCase() === provider.name.toLowerCase())) {
         return res.status(400).json({ message: "This provider is already in your estate" });
+      }
+      const tierCheck = await storage.canProviderBeAddedToEstate(providerId, estateId);
+      if (!tierCheck.allowed) {
+        return res.status(400).json({ message: tierCheck.reason || "Provider's subscription does not allow being added to this estate" });
       }
       await storage.addProviderToEstate(providerId, estateId);
       res.json({ message: "Provider added to estate" });

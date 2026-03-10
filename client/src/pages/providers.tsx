@@ -1114,37 +1114,56 @@ function AdminBrowseTab({ estateId }: { estateId: string }) {
         <div className="space-y-2">
           {filtered.map((p) => {
             const icon = categoryIcons[p.category?.toLowerCase()] || "📋";
+            const canAdd = (p as any)._canAdd;
+            const tierReason = (p as any)._tierReason;
+            const tierLabel = (p as any)._tierName;
             return (
               <motion.div
                 key={p.id}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="glass-card rounded-xl p-3 flex items-center gap-3"
+                className={`glass-card rounded-xl p-3 flex items-center gap-3 ${!canAdd ? "opacity-60" : ""}`}
                 data-testid={`card-browse-provider-${p.id}`}
               >
                 <div className="w-9 h-9 rounded-lg gradient-teal-subtle flex items-center justify-center text-base flex-shrink-0">
                   {icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm truncate">{p.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium text-sm truncate">{p.name}</h4>
+                    {tierLabel && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${canAdd ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
+                        {tierLabel}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[10px] text-muted-foreground capitalize">{p.category}</span>
+                  {!canAdd && tierReason && (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">{tierReason}</p>
+                  )}
                   {p.services && p.services.length > 0 && (
                     <div className="mt-1">
                       <ServiceTags services={p.services} max={2} size="sm" />
                     </div>
                   )}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-lg h-8 text-xs gap-1 flex-shrink-0 border-primary/30 text-primary hover:bg-primary/5"
-                  onClick={() => addMutation.mutate(p.id)}
-                  disabled={addMutation.isPending}
-                  data-testid={`button-add-provider-${p.id}`}
-                >
-                  <Plus className="w-3 h-3" />
-                  Add
-                </Button>
+                {canAdd ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-lg h-8 text-xs gap-1 flex-shrink-0 border-primary/30 text-primary hover:bg-primary/5"
+                    onClick={() => addMutation.mutate(p.id)}
+                    disabled={addMutation.isPending}
+                    data-testid={`button-add-provider-${p.id}`}
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add
+                  </Button>
+                ) : (
+                  <Badge variant="outline" className="text-[9px] px-2 py-1 rounded-lg border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400 flex-shrink-0 whitespace-nowrap">
+                    Upgrade needed
+                  </Badge>
+                )}
               </motion.div>
             );
           })}
@@ -1567,10 +1586,17 @@ export default function ProvidersPage() {
                       const icon = categoryIcons[p.category.toLowerCase()] || "📋";
                       const pReviews = getProviderReviews(p.id);
                       const avg = getAverageRating(p.id);
+                      const canAdd = (p as any)._canAdd;
+                      const tierReason = (p as any)._tierReason;
+                      const tierLabel = (p as any)._tierName;
                       return (
                         <div
                           key={p.id}
-                          className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all"
+                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                            canAdd
+                              ? "border-border/50 hover:border-primary/30 hover:bg-primary/5"
+                              : "border-border/30 opacity-60"
+                          }`}
                           data-testid={`recommend-provider-${p.id}`}
                         >
                           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-50 to-emerald-100 dark:from-teal-900/40 dark:to-emerald-900/30 flex items-center justify-center text-base flex-shrink-0">
@@ -1588,7 +1614,15 @@ export default function ProvidersPage() {
                                   {avg.toFixed(1)} ({pReviews.length})
                                 </span>
                               )}
+                              {tierLabel && (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${canAdd ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
+                                  {tierLabel} plan
+                                </span>
+                              )}
                             </div>
+                            {!canAdd && tierReason && (
+                              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">{tierReason}</p>
+                            )}
                             {p.services && p.services.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {p.services.slice(0, 3).map((s) => (
@@ -1600,15 +1634,21 @@ export default function ProvidersPage() {
                               </div>
                             )}
                           </div>
-                          <Button
-                            size="sm"
-                            className="rounded-lg gradient-teal text-white text-xs h-8 px-3 flex-shrink-0"
-                            disabled={recommendMutation.isPending}
-                            onClick={() => handleRecommendProvider(p.id)}
-                            data-testid={`button-recommend-${p.id}`}
-                          >
-                            {recommendMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Recommend"}
-                          </Button>
+                          {canAdd ? (
+                            <Button
+                              size="sm"
+                              className="rounded-lg gradient-teal text-white text-xs h-8 px-3 flex-shrink-0"
+                              disabled={recommendMutation.isPending}
+                              onClick={() => handleRecommendProvider(p.id)}
+                              data-testid={`button-recommend-${p.id}`}
+                            >
+                              {recommendMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Recommend"}
+                            </Button>
+                          ) : (
+                            <Badge variant="outline" className="text-[9px] px-2 py-1 rounded-lg border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400 flex-shrink-0 whitespace-nowrap">
+                              Upgrade needed
+                            </Badge>
+                          )}
                         </div>
                       );
                     })

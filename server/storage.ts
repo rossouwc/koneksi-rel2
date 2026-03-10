@@ -74,6 +74,8 @@ export interface IStorage {
   approveProvider(id: string): Promise<Provider>;
   rejectProvider(id: string): Promise<void>;
   getAllRegisteredProviders(): Promise<Provider[]>;
+  getProviderEstateCount(providerId: string): Promise<number>;
+  canProviderBeAddedToEstate(providerId: string, estateId: string): Promise<{ allowed: boolean; reason?: string; tierName?: string }>;
   addProviderToEstate(providerId: string, estateId: string): Promise<void>;
 
   getProviderInvitations(estateId: string): Promise<ProviderInvitation[]>;
@@ -402,6 +404,72 @@ export class DatabaseStorage implements IStorage {
 
   async rejectProvider(id: string): Promise<void> {
     await db.delete(providers).where(eq(providers.id, id));
+  }
+
+  async getProviderEstateCount(providerId: string): Promise<number> {
+    const linkedEstates = await db.select().from(providerVisibleEstates).where(eq(providerVisibleEstates.providerId, providerId));
+    const estateIds = new Set(linkedEstates.map(l => l.estateId));
+    return estateIds.size;
+  }
+
+  async getCanonicalProviderId(providerId: string): Promise<string> {
+    const provider = await this.getProvider(providerId);
+    if (!provider || !provider.createdBy) return providerId;
+    const [canonical] = await db.select().from(providers).where(and(
+      eq(providers.createdBy, provider.createdBy),
+      eq(providers.providerApprovalStatus, "approved"),
+      sql`${providers.estateId} IS NULL`
+    )).limit(1);
+    return canonical ? canonical.id : providerId;
+  }
+
+  async canProviderBeAddedToEstate(providerId: string, estateId: string): Promise<{ allowed: boolean; reason?: string; tierName?: string }> {
+    const canonicalId = await this.getCanonicalProviderId(providerId);
+    const sub = await this.getProviderSubscription(canonicalId);
+    if (!sub) {
+      return { allowed: false, reason: "Provider has no active subscription", tierName: "None" };
+    }
+    const tiers = await this.getSubscriptionTiers();
+    const tier = tiers.find(t => t.id === sub.tierId);
+    if (!tier) {
+      return { allowed: false, reason: "Invalid subscription tier" };
+    }
+
+    const estate = await this.getEstate(estateId);
+
+    if (tier.scopeType === "national") {
+      return { allowed: true, tierName: tier.name };
+    }
+
+    if (tier.scopeType === "province") {
+      if (!sub.selectedProvince || !estate?.province) {
+        return { allowed: false, reason: "Province scope requires a selected province", tierName: tier.name };
+      }
+      if (sub.selectedProvince.toLowerCase() !== estate.province.toLowerCase()) {
+        return { allowed: false, reason: `Provider covers ${sub.selectedProvince} only, not ${estate.province}`, tierName: tier.name };
+      }
+      return { allowed: true, tierName: tier.name };
+    }
+
+    if (tier.scopeType === "city") {
+      if (!sub.selectedCity || !estate?.city) {
+        return { allowed: false, reason: "City scope requires a selected city", tierName: tier.name };
+      }
+      if (sub.selectedCity.toLowerCase() !== estate.city.toLowerCase()) {
+        return { allowed: false, reason: `Provider covers ${sub.selectedCity} only, not ${estate.city}`, tierName: tier.name };
+      }
+      return { allowed: true, tierName: tier.name };
+    }
+
+    if (tier.scopeType === "estate" && tier.maxEstates) {
+      const currentCount = await this.getProviderEstateCount(canonicalId);
+      if (currentCount >= tier.maxEstates) {
+        return { allowed: false, reason: `Provider is on the ${tier.name} plan (max ${tier.maxEstates} estate${tier.maxEstates > 1 ? 's' : ''}). They need to upgrade to be added to more estates.`, tierName: tier.name };
+      }
+      return { allowed: true, tierName: tier.name };
+    }
+
+    return { allowed: false, reason: "Provider subscription doesn't support estate visibility" };
   }
 
   async getAllRegisteredProviders(): Promise<Provider[]> {
