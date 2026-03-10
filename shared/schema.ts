@@ -96,6 +96,20 @@ export const providers = pgTable("providers", {
   website: text("website"),
   description: text("description"),
   services: text("services").array(),
+  providerApprovalStatus: text("provider_approval_status").default("approved"),
+  recommendedBy: varchar("recommended_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const providerInvitations = pgTable("provider_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  estateId: varchar("estate_id").notNull(),
+  invitedByUserId: varchar("invited_by_user_id").notNull(),
+  providerName: text("provider_name").notNull(),
+  providerEmail: text("provider_email"),
+  providerPhone: text("provider_phone"),
+  category: text("category"),
+  status: text("status").default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -172,6 +186,7 @@ export const insertSubscriptionTierSchema = createInsertSchema(subscriptionTiers
 export const insertProviderSubscriptionSchema = createInsertSchema(providerSubscriptions).omit({ id: true, startedAt: true });
 export const insertProviderVisibleEstateSchema = createInsertSchema(providerVisibleEstates).omit({ id: true });
 export const insertUserPropertySchema = createInsertSchema(userProperties).omit({ id: true, createdAt: true });
+export const insertProviderInvitationSchema = createInsertSchema(providerInvitations).omit({ id: true, createdAt: true, status: true });
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -233,3 +248,5 @@ export type ProviderVisibleEstate = typeof providerVisibleEstates.$inferSelect;
 export type InsertProviderVisibleEstate = z.infer<typeof insertProviderVisibleEstateSchema>;
 export type UserProperty = typeof userProperties.$inferSelect;
 export type InsertUserProperty = z.infer<typeof insertUserPropertySchema>;
+export type ProviderInvitation = typeof providerInvitations.$inferSelect;
+export type InsertProviderInvitation = z.infer<typeof insertProviderInvitationSchema>;

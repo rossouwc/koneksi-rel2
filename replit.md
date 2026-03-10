@@ -57,7 +57,8 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - **userProperties** - id (UUID), userId, name, streetAddress, suburb, city, province, postalCode, createdAt (standalone residential addresses not in any estate)
 - **bills** - userId, estateId, propertyId (nullable), title, amount (cents), dueDate, category, status, provider, billingPeriod, accountNumber, usageKwh (whole kWh), usageKl (kL × 10 for 1dp precision), tariffRate (cents)
 - **outages** - userId, estateId, propertyId (nullable), type (electricity/water/internet/gas/other), title, description, status
-- **providers** - estateId, createdBy, name, category, phone, whatsapp, email, website, description
+- **providers** - estateId, createdBy, name, category, phone, whatsapp, email, website, description, providerApprovalStatus (approved/pending/rejected, default approved), recommendedBy (userId of recommender)
+- **providerInvitations** - estateId, invitedByUserId, providerName, providerEmail, providerPhone, category, status (pending/registered/expired)
 - **reviews** - providerId, userId, rating, comment
 - **subscriptionTiers** - id, name, monthlyPrice (cents), maxEstates, scopeType (estate/city/province/national), description, sortOrder
 - **providerSubscriptions** - id, providerId, tierId, status (active/paused/canceled/free), selectedCity, selectedProvince, payfastToken, startedAt, nextBillingDate
@@ -69,7 +70,9 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `/` - Dashboard when authenticated
 - `/bills` - Bill management with add dialog
 - `/outages` - Outage reporting and tracking
-- `/providers` - Service providers directory: searchable + filterable (category, rating), provider detail view with reviews + reviewer names, review submission with star ratings, phone/WhatsApp/email/website contact buttons
+- `/providers` - Service providers directory: searchable + filterable (category, rating, services), provider detail view with reviews + reviewer names, review submission with star ratings, phone/WhatsApp/email/website contact buttons
+  - Residents: browse approved providers, "Recommend a Provider" (pending admin approval), "Invite a Provider" (unregistered providers)
+  - Estate Admins: admin panel with tabs (Pending / Browse / Invitations), approve/reject recommendations, add registered providers from platform, view resident invitations
 - `/join-estate` - Join estate via invite code + view current estates + manage standalone properties + create estate (admin only)
 - `/bill-analyzer` - AI-powered bill analysis: drag-drop/camera upload, hardcoded sample analysis, results cards (extracted data, overcharges, savings tips), saves to bills table
 - `/alerts` - Outage alerts with Leaflet map view, list view, FAB to report, photo upload, type filtering, polling
@@ -120,8 +123,16 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - POST /api/estates/join - Join estate by invite code
 - GET/POST /api/bills - Bills CRUD (RLS: scoped to user's estates or personal)
 - GET/POST /api/outages - Outages CRUD (RLS: scoped to user's estates or personal)
-- GET/POST /api/providers - Providers CRUD (RLS: scoped to user's estates)
+- GET/POST /api/providers - Providers CRUD (RLS: scoped to user's estates, only approved providers)
+- POST /api/providers/recommend - Resident recommends a provider (status=pending, needs admin approval)
+- POST /api/providers/invite - Resident invites an unregistered provider by name/email/phone
 - GET /api/providers/:id - Provider detail with reviews + reviewer names
+- GET /api/estates/:id/pending-providers - Pending provider recommendations (estate admin only)
+- PATCH /api/estates/:id/providers/:providerId/approve - Approve provider (estate admin only)
+- PATCH /api/estates/:id/providers/:providerId/reject - Reject provider (estate admin only)
+- GET /api/estates/:id/registered-providers - Browse all registered providers not yet in estate (estate admin only)
+- POST /api/estates/:id/providers/:providerId/add - Add registered provider to estate (estate admin only)
+- GET /api/estates/:id/invitations - View provider invitations from residents (estate admin only)
 - GET/POST /api/reviews - Reviews CRUD (scoped to user's accessible providers)
 - POST /api/bills/analyze - Upload bill image + get AI analysis (multipart FormData, hardcoded sample response)
 - POST /api/outages/report - Report outage with photo upload (multipart FormData, multer)

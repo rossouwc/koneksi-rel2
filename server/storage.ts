@@ -10,9 +10,10 @@ import {
   type ProviderSubscription, type InsertProviderSubscription,
   type ProviderVisibleEstate,
   type UserProperty, type InsertUserProperty,
+  type ProviderInvitation, type InsertProviderInvitation,
   users, estates, userEstates, bills, outages, providers, reviews,
   subscriptionTiers, providerSubscriptions, providerVisibleEstates,
-  userProperties,
+  userProperties, providerInvitations,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or, inArray, sql } from "drizzle-orm";
@@ -68,6 +69,16 @@ export interface IStorage {
   createUserProperty(data: InsertUserProperty): Promise<UserProperty>;
   deleteUserProperty(id: string, userId: string): Promise<void>;
   getUserProperty(id: string): Promise<UserProperty | undefined>;
+
+  getPendingProviders(estateId: string): Promise<Provider[]>;
+  approveProvider(id: string): Promise<Provider>;
+  rejectProvider(id: string): Promise<void>;
+  getAllRegisteredProviders(): Promise<Provider[]>;
+  addProviderToEstate(providerId: string, estateId: string): Promise<void>;
+
+  getProviderInvitations(estateId: string): Promise<ProviderInvitation[]>;
+  createProviderInvitation(data: InsertProviderInvitation): Promise<ProviderInvitation>;
+  updateProviderInvitationStatus(id: string, status: string): Promise<ProviderInvitation>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -192,10 +203,10 @@ export class DatabaseStorage implements IStorage {
 
   async getProvidersScoped(userId: string, estateIds: string[], estateId?: string): Promise<Provider[]> {
     if (estateId) {
-      return db.select().from(providers).where(eq(providers.estateId, estateId)).orderBy(desc(providers.createdAt));
+      return db.select().from(providers).where(and(eq(providers.estateId, estateId), eq(providers.providerApprovalStatus, "approved"))).orderBy(desc(providers.createdAt));
     }
     if (estateIds.length > 0) {
-      return db.select().from(providers).where(inArray(providers.estateId, estateIds)).orderBy(desc(providers.createdAt));
+      return db.select().from(providers).where(and(inArray(providers.estateId, estateIds), eq(providers.providerApprovalStatus, "approved"))).orderBy(desc(providers.createdAt));
     }
     return [];
   }
@@ -305,14 +316,14 @@ export class DatabaseStorage implements IStorage {
     const estate = await this.getEstate(estateId);
     if (!estate) return [];
 
-    const directProviders = await db.select().from(providers).where(eq(providers.estateId, estateId));
+    const directProviders = await db.select().from(providers).where(and(eq(providers.estateId, estateId), eq(providers.providerApprovalStatus, "approved")));
 
     const visibleLinks = await db.select().from(providerVisibleEstates).where(eq(providerVisibleEstates.estateId, estateId));
     const visibleProviderIds = visibleLinks.map((v) => v.providerId);
 
     let linkedProviders: Provider[] = [];
     if (visibleProviderIds.length > 0) {
-      linkedProviders = await db.select().from(providers).where(inArray(providers.id, visibleProviderIds));
+      linkedProviders = await db.select().from(providers).where(and(inArray(providers.id, visibleProviderIds), eq(providers.providerApprovalStatus, "approved")));
     }
 
     const allSubs = await db.select().from(providerSubscriptions).where(eq(providerSubscriptions.status, "active"));
@@ -340,7 +351,7 @@ export class DatabaseStorage implements IStorage {
     const scopedIds = [...nationalProviderIds, ...provinceProviderIds, ...cityProviderIds];
     let scopedProviders: Provider[] = [];
     if (scopedIds.length > 0) {
-      scopedProviders = await db.select().from(providers).where(inArray(providers.id, scopedIds));
+      scopedProviders = await db.select().from(providers).where(and(inArray(providers.id, scopedIds), eq(providers.providerApprovalStatus, "approved")));
     }
 
     const allProviders = [...directProviders, ...linkedProviders, ...scopedProviders];
@@ -378,6 +389,50 @@ export class DatabaseStorage implements IStorage {
   async getUserProperty(id: string): Promise<UserProperty | undefined> {
     const [prop] = await db.select().from(userProperties).where(eq(userProperties.id, id));
     return prop;
+  }
+
+  async getPendingProviders(estateId: string): Promise<Provider[]> {
+    return db.select().from(providers).where(and(eq(providers.estateId, estateId), eq(providers.providerApprovalStatus, "pending"))).orderBy(desc(providers.createdAt));
+  }
+
+  async approveProvider(id: string): Promise<Provider> {
+    const [updated] = await db.update(providers).set({ providerApprovalStatus: "approved" }).where(eq(providers.id, id)).returning();
+    return updated;
+  }
+
+  async rejectProvider(id: string): Promise<void> {
+    await db.delete(providers).where(eq(providers.id, id));
+  }
+
+  async getAllRegisteredProviders(): Promise<Provider[]> {
+    return db.select().from(providers).where(and(
+      sql`${providers.createdBy} IS NOT NULL`,
+      eq(providers.providerApprovalStatus, "approved")
+    )).orderBy(desc(providers.createdAt));
+  }
+
+  async addProviderToEstate(providerId: string, estateId: string): Promise<void> {
+    const existing = await db.select().from(providerVisibleEstates).where(and(
+      eq(providerVisibleEstates.providerId, providerId),
+      eq(providerVisibleEstates.estateId, estateId)
+    ));
+    if (existing.length === 0) {
+      await db.insert(providerVisibleEstates).values({ providerId, estateId });
+    }
+  }
+
+  async getProviderInvitations(estateId: string): Promise<ProviderInvitation[]> {
+    return db.select().from(providerInvitations).where(eq(providerInvitations.estateId, estateId)).orderBy(desc(providerInvitations.createdAt));
+  }
+
+  async createProviderInvitation(data: InsertProviderInvitation): Promise<ProviderInvitation> {
+    const [created] = await db.insert(providerInvitations).values(data).returning();
+    return created;
+  }
+
+  async updateProviderInvitationStatus(id: string, status: string): Promise<ProviderInvitation> {
+    const [updated] = await db.update(providerInvitations).set({ status }).where(eq(providerInvitations.id, id)).returning();
+    return updated;
   }
 }
 

@@ -728,11 +728,17 @@ export async function registerRoutes(
   app.post("/api/providers", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
+      const user = await storage.getUser(userId);
       const { estateId } = req.body;
 
       if (estateId) {
-        const isMember = await verifyEstateMembership(userId, estateId);
-        if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+        const link = await storage.getUserEstateLink(userId, estateId);
+        if (!link || link.approvalStatus !== "approved") {
+          return res.status(403).json({ message: "Not a member of this estate" });
+        }
+        if (link.roleInEstate !== "estate_admin" && user?.role !== "supplier") {
+          return res.status(403).json({ message: "Only estate admins can add providers directly. Use the recommend option instead." });
+        }
         const check = await requireApprovedEstate(estateId);
         if (!check.approved) return res.status(403).json({ message: check.message });
       }
@@ -744,6 +750,172 @@ export async function registerRoutes(
       }
       const provider = await storage.createProvider({ ...rest, website: safeWebsite });
       res.json(provider);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/providers/recommend", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { estateId, name, category, phone, whatsapp, email, website, description, services } = req.body;
+      if (!estateId || !name || !category) {
+        return res.status(400).json({ message: "Estate, name, and category are required" });
+      }
+      const isMember = await verifyEstateMembership(userId, estateId);
+      if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+
+      let safeWebsite = website || null;
+      if (safeWebsite && !/^https?:\/\//i.test(safeWebsite)) {
+        safeWebsite = `https://${safeWebsite}`;
+      }
+
+      const provider = await storage.createProvider({
+        estateId,
+        createdBy: null,
+        name,
+        category,
+        phone: phone || null,
+        whatsapp: whatsapp || null,
+        email: email || null,
+        website: safeWebsite,
+        description: description || null,
+        services: services || null,
+        providerApprovalStatus: "pending",
+        recommendedBy: userId,
+      });
+      res.json(provider);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/providers/invite", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const { estateId, providerName, providerEmail, providerPhone, category } = req.body;
+      if (!estateId || !providerName) {
+        return res.status(400).json({ message: "Estate and provider name are required" });
+      }
+      const isMember = await verifyEstateMembership(userId, estateId);
+      if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+
+      const invitation = await storage.createProviderInvitation({
+        estateId,
+        invitedByUserId: userId,
+        providerName,
+        providerEmail: providerEmail || null,
+        providerPhone: providerPhone || null,
+        category: category || null,
+      });
+      res.json(invitation);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/estates/:id/pending-providers", requireAuth, async (req, res) => {
+    try {
+      const estateId = req.params.id;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can view pending providers" });
+      }
+      const pending = await storage.getPendingProviders(estateId);
+      const enriched = await Promise.all(pending.map(async (p) => {
+        const recommender = p.recommendedBy ? await storage.getUser(p.recommendedBy) : null;
+        return { ...p, _recommendedByName: recommender?.fullName || null };
+      }));
+      res.json(enriched);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/estates/:id/providers/:providerId/approve", requireAuth, async (req, res) => {
+    try {
+      const { id: estateId, providerId } = req.params;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can approve providers" });
+      }
+      const provider = await storage.getProvider(providerId);
+      if (!provider || provider.estateId !== estateId || provider.providerApprovalStatus !== "pending") {
+        return res.status(404).json({ message: "Pending provider not found in this estate" });
+      }
+      const updated = await storage.approveProvider(providerId);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/estates/:id/providers/:providerId/reject", requireAuth, async (req, res) => {
+    try {
+      const { id: estateId, providerId } = req.params;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can reject providers" });
+      }
+      const provider = await storage.getProvider(providerId);
+      if (!provider || provider.estateId !== estateId || provider.providerApprovalStatus !== "pending") {
+        return res.status(404).json({ message: "Pending provider not found in this estate" });
+      }
+      await storage.rejectProvider(providerId);
+      res.json({ message: "Provider rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/estates/:id/registered-providers", requireAuth, async (req, res) => {
+    try {
+      const estateId = req.params.id;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can browse registered providers" });
+      }
+      const allProviders = await storage.getAllRegisteredProviders();
+      const alreadyVisible = await storage.getVisibleProviders(estateId);
+      const alreadyIds = new Set(alreadyVisible.map((p) => p.id));
+      const filtered = allProviders.filter((p) => !alreadyIds.has(p.id) && p.estateId !== estateId);
+      res.json(filtered);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/estates/:id/providers/:providerId/add", requireAuth, async (req, res) => {
+    try {
+      const { id: estateId, providerId } = req.params;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can add providers" });
+      }
+      const provider = await storage.getProvider(providerId);
+      if (!provider || provider.providerApprovalStatus !== "approved") {
+        return res.status(404).json({ message: "Provider not found or not approved" });
+      }
+      await storage.addProviderToEstate(providerId, estateId);
+      res.json({ message: "Provider added to estate" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/estates/:id/invitations", requireAuth, async (req, res) => {
+    try {
+      const estateId = req.params.id;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can view invitations" });
+      }
+      const invitations = await storage.getProviderInvitations(estateId);
+      const enriched = await Promise.all(invitations.map(async (inv) => {
+        const inviter = await storage.getUser(inv.invitedByUserId);
+        return { ...inv, _invitedByName: inviter?.fullName || null };
+      }));
+      res.json(enriched);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

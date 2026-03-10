@@ -23,6 +23,13 @@ import {
   Crown,
   Wrench,
   X,
+  CheckCircle2,
+  XCircle,
+  UserPlus,
+  ThumbsUp,
+  Send,
+  Shield,
+  Inbox,
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Button } from "@/components/ui/button";
@@ -179,7 +186,6 @@ function ProviderDetail({
   providerId: string;
   onBack: () => void;
 }) {
-  const { user } = useAuth();
   const [showReviewForm, setShowReviewForm] = useState(false);
 
   const { data, isLoading } = useQuery<{ provider: Provider; reviews: (Review & { user?: { fullName: string } })[] }>({
@@ -649,52 +655,55 @@ function ProviderCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
+      onClick={onClick}
+      className={`glass-card rounded-2xl p-5 cursor-pointer transition-all duration-200 relative overflow-hidden ${
+        isPremium ? "ring-1 ring-primary/20" : ""
+      }`}
+      data-testid={`card-provider-${provider.id}`}
     >
-      <div
-        className={`glass-card rounded-xl p-5 cursor-pointer hover:shadow-lg transition-shadow ${isPremium ? "ring-1 ring-amber-500/20" : ""}`}
-        onClick={onClick}
-        data-testid={`provider-card-${provider.id}`}
-      >
-        <div className="flex items-start gap-3 mb-3">
-          <div className="w-11 h-11 rounded-xl gradient-teal-subtle flex items-center justify-center text-lg flex-shrink-0 relative">
+      {isPremium && (
+        <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-lg" />
+      )}
+      <div className="relative">
+        <div className="flex items-start gap-3.5 mb-3">
+          <div className="w-11 h-11 rounded-xl gradient-teal-subtle flex items-center justify-center text-lg flex-shrink-0">
             {icon}
-            {isPremium && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center" data-testid={`badge-premium-${provider.id}`}>
-                <Crown className="w-2.5 h-2.5 text-white" />
-              </div>
-            )}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm truncate">{provider.name}</h3>
-            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-              <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize">
-                {provider.category}
-              </span>
-              {isPremium && tierName && (
-                <span className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full border font-semibold ${badgeColor}`} data-testid={`tier-badge-${provider.id}`}>
-                  <Crown className="w-2 h-2" />
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-sm truncate" data-testid={`text-name-${provider.id}`}>
+                {provider.name}
+              </h3>
+              {isPremium && (
+                <Badge variant="outline" className={`text-[9px] px-1.5 py-0 rounded-full border ${badgeColor} flex-shrink-0`}>
+                  <Crown className="w-2 h-2 mr-0.5" />
                   {tierName}
-                </span>
+                </Badge>
               )}
             </div>
-          </div>
-          <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-            <StarRating rating={Math.round(avgRating)} />
-            <span className="text-[10px] text-muted-foreground">
-              {avgRating > 0 ? avgRating.toFixed(1) : "—"} · {reviews.length}
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize inline-block mt-0.5">
+              {provider.category}
             </span>
           </div>
         </div>
 
-        {provider.description && (
-          <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{provider.description}</p>
-        )}
+        <div className="flex items-center gap-2 mb-2">
+          <StarRating rating={Math.round(avgRating)} />
+          <span className="text-xs text-muted-foreground">
+            {avgRating > 0 ? `${avgRating.toFixed(1)} (${reviews.length})` : "No reviews"}
+          </span>
+        </div>
 
         {provider.services && provider.services.length > 0 && (
-          <div className="mb-3" data-testid={`container-card-services-${provider.id}`}>
+          <div className="mb-3">
             <ServiceTags services={provider.services} max={3} />
           </div>
+        )}
+
+        {provider.description && (
+          <p className="text-xs text-muted-foreground line-clamp-2 mb-3 leading-relaxed">
+            {provider.description}
+          </p>
         )}
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -760,15 +769,484 @@ function ProviderCard({
   );
 }
 
+function ProviderFormFields({
+  name, setName, category, setCategory, phone, setPhone, whatsapp, setWhatsapp,
+  email, setEmail, website, setWebsite, description, setDescription,
+  providerServices, setProviderServices, showProviderServicesDrop, setShowProviderServicesDrop,
+}: any) {
+  return (
+    <>
+      <div>
+        <Label className="text-sm">Name</Label>
+        <Input
+          data-testid="input-provider-name"
+          value={name}
+          onChange={(e: any) => setName(e.target.value)}
+          placeholder="Provider name"
+          className="rounded-lg mt-1.5"
+          required
+        />
+      </div>
+      <div>
+        <Label className="text-sm">Category</Label>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger data-testid="select-provider-category" className="rounded-lg mt-1.5">
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent>
+            {providerCategories.map((c) => (
+              <SelectItem key={c} value={c.toLowerCase()}>
+                {categoryIcons[c.toLowerCase()] || "📋"} {c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-sm">Phone</Label>
+          <Input
+            data-testid="input-provider-phone"
+            value={phone}
+            onChange={(e: any) => setPhone(e.target.value)}
+            placeholder="+27..."
+            className="rounded-lg mt-1.5"
+          />
+        </div>
+        <div>
+          <Label className="text-sm">WhatsApp</Label>
+          <Input
+            data-testid="input-provider-whatsapp"
+            value={whatsapp}
+            onChange={(e: any) => setWhatsapp(e.target.value)}
+            placeholder="+27..."
+            className="rounded-lg mt-1.5"
+          />
+        </div>
+      </div>
+      <div>
+        <Label className="text-sm">Email</Label>
+        <Input
+          data-testid="input-provider-email"
+          type="email"
+          value={email}
+          onChange={(e: any) => setEmail(e.target.value)}
+          placeholder="email@provider.co.za"
+          className="rounded-lg mt-1.5"
+        />
+      </div>
+      <div>
+        <Label className="text-sm">Website</Label>
+        <Input
+          data-testid="input-provider-website"
+          value={website}
+          onChange={(e: any) => setWebsite(e.target.value)}
+          placeholder="https://..."
+          className="rounded-lg mt-1.5"
+        />
+      </div>
+      <div>
+        <Label className="text-sm">Services</Label>
+        <div className="relative mt-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full rounded-lg justify-between text-sm font-normal h-10"
+            onClick={() => setShowProviderServicesDrop(!showProviderServicesDrop)}
+            data-testid="button-provider-services-dropdown"
+          >
+            {providerServices.length > 0 ? `${providerServices.length} selected` : "Select services"}
+            <ChevronDown className={`w-4 h-4 transition-transform ${showProviderServicesDrop ? "rotate-180" : ""}`} />
+          </Button>
+          {showProviderServicesDrop && (
+            <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border bg-popover shadow-lg overflow-hidden">
+              <div className="max-h-[200px] overflow-y-auto p-1">
+                {[...SERVICE_OPTIONS].map((service) => (
+                  <button
+                    key={service}
+                    type="button"
+                    onClick={() => {
+                      setProviderServices(
+                        providerServices.includes(service)
+                          ? providerServices.filter((s: string) => s !== service)
+                          : [...providerServices, service]
+                      );
+                    }}
+                    className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center gap-2 ${
+                      providerServices.includes(service) ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-muted/50"
+                    }`}
+                    data-testid={`option-add-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
+                  >
+                    <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[8px] ${
+                      providerServices.includes(service) ? "bg-primary border-primary text-white" : "border-muted-foreground/30"
+                    }`}>
+                      {providerServices.includes(service) && "✓"}
+                    </span>
+                    {service}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {providerServices.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {providerServices.map((s: string) => (
+                <Badge
+                  key={s}
+                  variant="outline"
+                  className={`text-[10px] px-2 py-0.5 rounded-full border ${getServiceColor(s)} cursor-pointer`}
+                  onClick={() => setProviderServices(providerServices.filter((x: string) => x !== s))}
+                >
+                  {s}
+                  <X className="w-2.5 h-2.5 ml-1" />
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div>
+        <Label className="text-sm">Description</Label>
+        <Textarea
+          data-testid="input-provider-description"
+          value={description}
+          onChange={(e: any) => setDescription(e.target.value)}
+          placeholder="Brief description of services..."
+          className="rounded-lg mt-1.5 resize-none"
+          rows={2}
+        />
+      </div>
+    </>
+  );
+}
+
+function AdminPendingTab({ estateId }: { estateId: string }) {
+  const { toast } = useToast();
+
+  const { data: pending = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/estates", estateId, "pending-providers"],
+    queryFn: async () => {
+      const res = await fetch(`/api/estates/${estateId}/pending-providers`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load");
+      return res.json();
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (providerId: string) => {
+      await apiRequest("PATCH", `/api/estates/${estateId}/providers/${providerId}/approve`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estates", estateId, "pending-providers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/providers"] });
+      toast({ title: "Provider approved" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (providerId: string) => {
+      await apiRequest("PATCH", `/api/estates/${estateId}/providers/${providerId}/reject`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estates", estateId, "pending-providers"] });
+      toast({ title: "Provider rejected" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (pending.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <CheckCircle2 className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+        <p className="text-sm text-muted-foreground">No pending provider recommendations</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {pending.map((p: any) => {
+        const icon = categoryIcons[p.category?.toLowerCase()] || "📋";
+        return (
+          <motion.div
+            key={p.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card rounded-xl p-4"
+            data-testid={`card-pending-provider-${p.id}`}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl gradient-teal-subtle flex items-center justify-center text-lg flex-shrink-0">
+                {icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-sm truncate">{p.name}</h4>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize inline-block mt-0.5">
+                  {p.category}
+                </span>
+                {p._recommendedByName && (
+                  <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                    <User className="w-2.5 h-2.5" />
+                    Recommended by {p._recommendedByName}
+                  </p>
+                )}
+                {p.phone && <p className="text-[10px] text-muted-foreground mt-0.5">{p.phone}</p>}
+                {p.description && <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{p.description}</p>}
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-lg h-8 text-xs gap-1 text-red-500 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-900/20"
+                onClick={() => rejectMutation.mutate(p.id)}
+                disabled={rejectMutation.isPending}
+                data-testid={`button-reject-provider-${p.id}`}
+              >
+                <XCircle className="w-3 h-3" />
+                Reject
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-lg h-8 text-xs gap-1 gradient-teal text-white"
+                onClick={() => approveMutation.mutate(p.id)}
+                disabled={approveMutation.isPending}
+                data-testid={`button-approve-provider-${p.id}`}
+              >
+                <CheckCircle2 className="w-3 h-3" />
+                Approve
+              </Button>
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AdminBrowseTab({ estateId }: { estateId: string }) {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+
+  const { data: registered = [], isLoading } = useQuery<Provider[]>({
+    queryKey: ["/api/estates", estateId, "registered-providers"],
+    queryFn: async () => {
+      const res = await fetch(`/api/estates/${estateId}/registered-providers`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load");
+      return res.json();
+    },
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (providerId: string) => {
+      await apiRequest("POST", `/api/estates/${estateId}/providers/${providerId}/add`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estates", estateId, "registered-providers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/providers"] });
+      toast({ title: "Provider added to estate" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const filtered = useMemo(() => {
+    if (!search) return registered;
+    const q = search.toLowerCase();
+    return registered.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      p.category.toLowerCase().includes(q) ||
+      (p.services && p.services.some((s) => s.toLowerCase().includes(q)))
+    );
+  }, [registered, search]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-20 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          data-testid="input-browse-search"
+          placeholder="Search registered providers..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10 rounded-xl"
+        />
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-10">
+          <Store className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
+          <p className="text-sm text-muted-foreground">
+            {search ? "No matching providers found" : "No additional providers available"}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((p) => {
+            const icon = categoryIcons[p.category?.toLowerCase()] || "📋";
+            return (
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-card rounded-xl p-3 flex items-center gap-3"
+                data-testid={`card-browse-provider-${p.id}`}
+              >
+                <div className="w-9 h-9 rounded-lg gradient-teal-subtle flex items-center justify-center text-base flex-shrink-0">
+                  {icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm truncate">{p.name}</h4>
+                  <span className="text-[10px] text-muted-foreground capitalize">{p.category}</span>
+                  {p.services && p.services.length > 0 && (
+                    <div className="mt-1">
+                      <ServiceTags services={p.services} max={2} size="sm" />
+                    </div>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-lg h-8 text-xs gap-1 flex-shrink-0 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={() => addMutation.mutate(p.id)}
+                  disabled={addMutation.isPending}
+                  data-testid={`button-add-provider-${p.id}`}
+                >
+                  <Plus className="w-3 h-3" />
+                  Add
+                </Button>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminInvitationsTab({ estateId }: { estateId: string }) {
+  const { data: invitations = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/estates", estateId, "invitations"],
+    queryFn: async () => {
+      const res = await fetch(`/api/estates/${estateId}/invitations`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load");
+      return res.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-20 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (invitations.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Send className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+        <p className="text-sm text-muted-foreground">No provider invitations yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {invitations.map((inv: any) => (
+        <motion.div
+          key={inv.id}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card rounded-xl p-3"
+          data-testid={`card-invitation-${inv.id}`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h4 className="font-medium text-sm truncate">{inv.providerName}</h4>
+              {inv.category && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize inline-block mt-0.5">
+                  {inv.category}
+                </span>
+              )}
+              <div className="flex flex-col gap-0.5 mt-1">
+                {inv.providerEmail && (
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Mail className="w-2.5 h-2.5" />
+                    {inv.providerEmail}
+                  </p>
+                )}
+                {inv.providerPhone && (
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Phone className="w-2.5 h-2.5" />
+                    {inv.providerPhone}
+                  </p>
+                )}
+              </div>
+              {inv._invitedByName && (
+                <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                  <User className="w-2.5 h-2.5" />
+                  Invited by {inv._invitedByName}
+                </p>
+              )}
+            </div>
+            <Badge
+              variant="outline"
+              className={`text-[9px] px-2 py-0.5 rounded-full flex-shrink-0 ${
+                inv.status === "pending"
+                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                  : inv.status === "registered"
+                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                  : "bg-muted text-muted-foreground border-muted"
+              }`}
+            >
+              {inv.status === "pending" ? "Pending" : inv.status === "registered" ? "Registered" : inv.status}
+            </Badge>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
 export default function ProvidersPage() {
-  const { currentEstate } = useEstate();
+  const { currentEstate, isEstateAdmin } = useEstate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [ratingFilter, setRatingFilter] = useState("all");
   const [servicesFilter, setServicesFilter] = useState<string[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [recommendDialogOpen, setRecommendDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [adminTab, setAdminTab] = useState<"pending" | "browse" | "invitations">("pending");
+
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [phone, setPhone] = useState("");
@@ -779,6 +1257,11 @@ export default function ProvidersPage() {
   const [providerServices, setProviderServices] = useState<string[]>([]);
   const [showProviderServicesDrop, setShowProviderServicesDrop] = useState(false);
 
+  const [invName, setInvName] = useState("");
+  const [invEmail, setInvEmail] = useState("");
+  const [invPhone, setInvPhone] = useState("");
+  const [invCategory, setInvCategory] = useState("");
+
   const providersUrl = currentEstate ? `/api/providers?estateId=${currentEstate.id}` : "/api/providers";
   const { data: providers = [], isLoading } = useQuery<Provider[]>({
     queryKey: [providersUrl],
@@ -788,22 +1271,53 @@ export default function ProvidersPage() {
     queryKey: ["/api/reviews"],
   });
 
-  const createMutation = useMutation({
+  const { data: pendingProviders = [] } = useQuery<any[]>({
+    queryKey: ["/api/estates", currentEstate?.id, "pending-providers"],
+    queryFn: async () => {
+      if (!currentEstate?.id) return [];
+      const res = await fetch(`/api/estates/${currentEstate.id}/pending-providers`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentEstate?.id && isEstateAdmin,
+  });
+
+  const resetForm = () => {
+    setName("");
+    setCategory("");
+    setPhone("");
+    setWhatsapp("");
+    setEmail("");
+    setWebsite("");
+    setDescription("");
+    setProviderServices([]);
+    setShowProviderServicesDrop(false);
+  };
+
+  const recommendMutation = useMutation({
+    mutationFn: async (data: any) => {
+      await apiRequest("POST", "/api/providers/recommend", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [providersUrl] });
+      queryClient.invalidateQueries({ queryKey: ["/api/estates", currentEstate?.id, "pending-providers"] });
+      setRecommendDialogOpen(false);
+      resetForm();
+      toast({ title: "Provider recommended", description: "Your recommendation has been sent to the estate admin for approval." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const createDirectMutation = useMutation({
     mutationFn: async (data: any) => {
       await apiRequest("POST", "/api/providers", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [providersUrl] });
-      setDialogOpen(false);
-      setName("");
-      setCategory("");
-      setPhone("");
-      setWhatsapp("");
-      setEmail("");
-      setWebsite("");
-      setDescription("");
-      setProviderServices([]);
-      setShowProviderServicesDrop(false);
+      setRecommendDialogOpen(false);
+      resetForm();
       toast({ title: "Provider added successfully" });
     },
     onError: (err: any) => {
@@ -811,18 +1325,61 @@ export default function ProvidersPage() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const inviteMutation = useMutation({
+    mutationFn: async (data: any) => {
+      await apiRequest("POST", "/api/providers/invite", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estates", currentEstate?.id, "invitations"] });
+      setInviteDialogOpen(false);
+      setInvName("");
+      setInvEmail("");
+      setInvPhone("");
+      setInvCategory("");
+      toast({ title: "Invitation sent", description: "The provider will be notified about your estate." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleRecommendSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate({
-      name,
-      category,
-      phone: phone || null,
-      whatsapp: whatsapp || null,
-      email: email || null,
-      website: website || null,
-      description: description || null,
-      services: providerServices.length > 0 ? providerServices : null,
-      estateId: currentEstate?.id || null,
+    if (isEstateAdmin) {
+      createDirectMutation.mutate({
+        name,
+        category,
+        phone: phone || null,
+        whatsapp: whatsapp || null,
+        email: email || null,
+        website: website || null,
+        description: description || null,
+        services: providerServices.length > 0 ? providerServices : null,
+        estateId: currentEstate?.id || null,
+      });
+    } else {
+      recommendMutation.mutate({
+        name,
+        category,
+        phone: phone || null,
+        whatsapp: whatsapp || null,
+        email: email || null,
+        website: website || null,
+        description: description || null,
+        services: providerServices.length > 0 ? providerServices : null,
+        estateId: currentEstate?.id,
+      });
+    }
+  };
+
+  const handleInviteSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    inviteMutation.mutate({
+      estateId: currentEstate?.id,
+      providerName: invName,
+      providerEmail: invEmail || null,
+      providerPhone: invPhone || null,
+      category: invCategory || null,
     });
   };
 
@@ -879,6 +1436,8 @@ export default function ProvidersPage() {
     );
   }
 
+  const pendingCount = pendingProviders.length;
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -890,170 +1449,198 @@ export default function ProvidersPage() {
               : "Find service providers in your area"}
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="rounded-xl gradient-teal text-white" data-testid="button-add-provider">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Provider
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="rounded-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add Provider</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label className="text-sm">Name</Label>
-                <Input
-                  data-testid="input-provider-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Provider name"
-                  className="rounded-lg mt-1.5"
-                  required
-                />
-              </div>
-              <div>
-                <Label className="text-sm">Category</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger data-testid="select-provider-category" className="rounded-lg mt-1.5">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {providerCategories.map((c) => (
-                      <SelectItem key={c} value={c.toLowerCase()}>
-                        {categoryIcons[c.toLowerCase()] || "📋"} {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-sm">Phone</Label>
-                  <Input
-                    data-testid="input-provider-phone"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+27..."
-                    className="rounded-lg mt-1.5"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm">WhatsApp</Label>
-                  <Input
-                    data-testid="input-provider-whatsapp"
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="+27..."
-                    className="rounded-lg mt-1.5"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm">Email</Label>
-                <Input
-                  data-testid="input-provider-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@provider.co.za"
-                  className="rounded-lg mt-1.5"
-                />
-              </div>
-              <div>
-                <Label className="text-sm">Website</Label>
-                <Input
-                  data-testid="input-provider-website"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="https://..."
-                  className="rounded-lg mt-1.5"
-                />
-              </div>
-              <div>
-                <Label className="text-sm">Services</Label>
-                <div className="relative mt-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full rounded-lg justify-between text-sm font-normal h-10"
-                    onClick={() => setShowProviderServicesDrop(!showProviderServicesDrop)}
-                    data-testid="button-provider-services-dropdown"
-                  >
-                    {providerServices.length > 0 ? `${providerServices.length} selected` : "Select services"}
-                    <ChevronDown className={`w-4 h-4 transition-transform ${showProviderServicesDrop ? "rotate-180" : ""}`} />
-                  </Button>
-                  {showProviderServicesDrop && (
-                    <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-xl border bg-popover shadow-lg overflow-hidden">
-                      <div className="max-h-[200px] overflow-y-auto p-1">
-                        {[...SERVICE_OPTIONS].map((service) => (
-                          <button
-                            key={service}
-                            type="button"
-                            onClick={() => {
-                              setProviderServices(
-                                providerServices.includes(service)
-                                  ? providerServices.filter((s) => s !== service)
-                                  : [...providerServices, service]
-                              );
-                            }}
-                            className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center gap-2 ${
-                              providerServices.includes(service) ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-muted/50"
-                            }`}
-                            data-testid={`option-add-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
-                          >
-                            <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[8px] ${
-                              providerServices.includes(service) ? "bg-primary border-primary text-white" : "border-muted-foreground/30"
-                            }`}>
-                              {providerServices.includes(service) && "✓"}
-                            </span>
-                            {service}
-                          </button>
+        {currentEstate && (
+          <div className="flex gap-2 flex-wrap">
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="rounded-xl text-sm gap-1.5" data-testid="button-invite-provider">
+                  <UserPlus className="w-4 h-4" />
+                  Invite Provider
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Invite a Provider</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground -mt-1">
+                  Know a great provider not yet on Koneksi? Invite them to join and serve your estate.
+                </p>
+                <form onSubmit={handleInviteSubmit} className="space-y-4 mt-2">
+                  <div>
+                    <Label className="text-sm">Provider Name</Label>
+                    <Input
+                      data-testid="input-invite-name"
+                      value={invName}
+                      onChange={(e) => setInvName(e.target.value)}
+                      placeholder="Business or provider name"
+                      className="rounded-lg mt-1.5"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Category</Label>
+                    <Select value={invCategory} onValueChange={setInvCategory}>
+                      <SelectTrigger data-testid="select-invite-category" className="rounded-lg mt-1.5">
+                        <SelectValue placeholder="Select category (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {providerCategories.map((c) => (
+                          <SelectItem key={c} value={c.toLowerCase()}>
+                            {categoryIcons[c.toLowerCase()] || "📋"} {c}
+                          </SelectItem>
                         ))}
-                      </div>
-                    </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Email</Label>
+                    <Input
+                      data-testid="input-invite-email"
+                      type="email"
+                      value={invEmail}
+                      onChange={(e) => setInvEmail(e.target.value)}
+                      placeholder="provider@example.com"
+                      className="rounded-lg mt-1.5"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm">Phone</Label>
+                    <Input
+                      data-testid="input-invite-phone"
+                      value={invPhone}
+                      onChange={(e) => setInvPhone(e.target.value)}
+                      placeholder="+27..."
+                      className="rounded-lg mt-1.5"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full rounded-xl gradient-teal text-white"
+                    disabled={inviteMutation.isPending}
+                    data-testid="button-submit-invite"
+                  >
+                    {inviteMutation.isPending ? "Sending..." : "Send Invitation"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={recommendDialogOpen} onOpenChange={setRecommendDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-xl gradient-teal text-white text-sm gap-1.5" data-testid="button-recommend-provider">
+                  {isEstateAdmin ? (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Add Provider
+                    </>
+                  ) : (
+                    <>
+                      <ThumbsUp className="w-4 h-4" />
+                      Recommend
+                    </>
                   )}
-                  {providerServices.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {providerServices.map((s) => (
-                        <Badge
-                          key={s}
-                          variant="outline"
-                          className={`text-[10px] px-2 py-0.5 rounded-full border ${getServiceColor(s)} cursor-pointer`}
-                          onClick={() => setProviderServices(providerServices.filter((x) => x !== s))}
-                        >
-                          {s}
-                          <X className="w-2.5 h-2.5 ml-1" />
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm">Description</Label>
-                <Textarea
-                  data-testid="input-provider-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Brief description of services..."
-                  className="rounded-lg mt-1.5 resize-none"
-                  rows={2}
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full rounded-xl gradient-teal text-white"
-                disabled={createMutation.isPending}
-                data-testid="button-submit-provider"
-              >
-                {createMutation.isPending ? "Adding..." : "Add Provider"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{isEstateAdmin ? "Add Provider" : "Recommend a Provider"}</DialogTitle>
+                </DialogHeader>
+                {!isEstateAdmin && (
+                  <p className="text-sm text-muted-foreground -mt-1">
+                    Your recommendation will be sent to the estate admin for approval.
+                  </p>
+                )}
+                <form onSubmit={handleRecommendSubmit} className="space-y-4 mt-1">
+                  <ProviderFormFields
+                    name={name} setName={setName}
+                    category={category} setCategory={setCategory}
+                    phone={phone} setPhone={setPhone}
+                    whatsapp={whatsapp} setWhatsapp={setWhatsapp}
+                    email={email} setEmail={setEmail}
+                    website={website} setWebsite={setWebsite}
+                    description={description} setDescription={setDescription}
+                    providerServices={providerServices} setProviderServices={setProviderServices}
+                    showProviderServicesDrop={showProviderServicesDrop} setShowProviderServicesDrop={setShowProviderServicesDrop}
+                  />
+                  <Button
+                    type="submit"
+                    className="w-full rounded-xl gradient-teal text-white"
+                    disabled={recommendMutation.isPending || createDirectMutation.isPending}
+                    data-testid="button-submit-provider"
+                  >
+                    {(recommendMutation.isPending || createDirectMutation.isPending)
+                      ? "Submitting..."
+                      : isEstateAdmin
+                        ? "Add Provider"
+                        : "Submit Recommendation"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
       </div>
+
+      {isEstateAdmin && currentEstate && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card rounded-2xl p-4"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Shield className="w-4 h-4 text-primary" />
+            <h2 className="font-semibold text-sm">Admin Management</h2>
+          </div>
+
+          <div className="flex gap-1 mb-4 bg-muted/30 rounded-xl p-1">
+            <button
+              onClick={() => setAdminTab("pending")}
+              className={`flex-1 text-xs py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                adminTab === "pending"
+                  ? "bg-background shadow-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="tab-pending-providers"
+            >
+              <Clock className="w-3 h-3" />
+              Pending
+              {pendingCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] flex items-center justify-center">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setAdminTab("browse")}
+              className={`flex-1 text-xs py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                adminTab === "browse"
+                  ? "bg-background shadow-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="tab-browse-providers"
+            >
+              <Search className="w-3 h-3" />
+              Browse
+            </button>
+            <button
+              onClick={() => setAdminTab("invitations")}
+              className={`flex-1 text-xs py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                adminTab === "invitations"
+                  ? "bg-background shadow-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="tab-invitations"
+            >
+              <Inbox className="w-3 h-3" />
+              Invites
+            </button>
+          </div>
+
+          {adminTab === "pending" && <AdminPendingTab estateId={currentEstate.id} />}
+          {adminTab === "browse" && <AdminBrowseTab estateId={currentEstate.id} />}
+          {adminTab === "invitations" && <AdminInvitationsTab estateId={currentEstate.id} />}
+        </motion.div>
+      )}
 
       <div className="space-y-3">
         <div className="relative">
@@ -1120,7 +1707,9 @@ export default function ProvidersPage() {
           <p className="text-sm text-muted-foreground">
             {searchQuery || categoryFilter !== "all" || ratingFilter !== "all" || servicesFilter.length > 0
               ? "Try adjusting your filters"
-              : "Add your first service provider"}
+              : currentEstate
+                ? "Recommend a provider to get started"
+                : "Join an estate to see providers"}
           </p>
         </motion.div>
       ) : (

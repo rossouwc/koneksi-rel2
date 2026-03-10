@@ -91,6 +91,18 @@ export default function Dashboard() {
     queryKey: [providersUrl],
   });
 
+  const { data: pendingProviderCount = 0 } = useQuery<number>({
+    queryKey: ["/api/estates", currentEstate?.id, "pending-providers-count"],
+    queryFn: async () => {
+      if (!currentEstate) return 0;
+      const res = await fetch(`/api/estates/${currentEstate.id}/pending-providers`, { credentials: "include" });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return data.length;
+    },
+    enabled: !!currentEstate && isEstateAdmin,
+  });
+
   const { data: pendingResidents = [] } = useQuery<{ userId: string; fullName: string; email: string; joinedAt: string }[]>({
     queryKey: ["/api/estates", currentEstate?.id, "pending-residents"],
     queryFn: async () => {
@@ -266,6 +278,36 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        </motion.div>
+      )}
+
+      {isEstateAdmin && currentEstate && pendingProviderCount > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.315, duration: 0.4 }}
+        >
+          <Link href="/providers">
+            <div
+              className="glass-card rounded-2xl p-5 cursor-pointer hover:shadow-lg transition-shadow group"
+              data-testid="section-pending-providers"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <Store className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm">Pending Providers</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {pendingProviderCount} provider{pendingProviderCount !== 1 ? "s" : ""} awaiting approval
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+              </div>
+            </div>
+          </Link>
         </motion.div>
       )}
 
