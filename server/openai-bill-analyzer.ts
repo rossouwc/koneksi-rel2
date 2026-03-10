@@ -115,15 +115,103 @@ async function analyzeWithImage(filePath: string): Promise<string> {
   return response.choices[0]?.message?.content || "";
 }
 
+const MAX_STREAMS_TO_SCAN = 30;
+const MAX_DECOMPRESSED_BYTES = 2 * 1024 * 1024;
+const MAX_STREAM_RAW_BYTES = 500 * 1024;
+
+function extractXfaData(fileBuffer: Buffer): string | null {
+  const zlib = require("zlib");
+  const str = fileBuffer.toString("binary");
+
+  if (str.indexOf("XFA") === -1) return null;
+
+  const streamPairs: { start: number; end: number }[] = [];
+  const streamMarker = "stream\n";
+  const streamMarkerR = "stream\r\n";
+  const endMarker = "\nendstream";
+  const endMarkerR = "\r\nendstream";
+  let searchPos = 0;
+
+  while (streamPairs.length < MAX_STREAMS_TO_SCAN) {
+    let startIdx = str.indexOf(streamMarkerR, searchPos);
+    let markerLen = streamMarkerR.length;
+    if (startIdx === -1) {
+      startIdx = str.indexOf(streamMarker, searchPos);
+      markerLen = streamMarker.length;
+    }
+    if (startIdx === -1) break;
+
+    const dataStart = startIdx + markerLen;
+    let endIdx = str.indexOf(endMarkerR, dataStart);
+    if (endIdx === -1) endIdx = str.indexOf(endMarker, dataStart);
+    if (endIdx === -1) break;
+
+    const size = endIdx - dataStart;
+    if (size > 0 && size <= MAX_STREAM_RAW_BYTES) {
+      streamPairs.push({ start: dataStart, end: endIdx });
+    }
+    searchPos = endIdx + 10;
+  }
+
+  const xmlParts: string[] = [];
+  let totalDecompressed = 0;
+
+  for (const pair of streamPairs) {
+    const raw = fileBuffer.slice(pair.start, pair.end);
+    try {
+      const decompressed = zlib.inflateSync(raw, { maxOutputLength: MAX_DECOMPRESSED_BYTES });
+      const text = decompressed.toString("utf-8");
+      if (text.includes("<xfa:data") || text.includes("datasets")) {
+        xmlParts.push(text);
+        totalDecompressed += decompressed.length;
+        if (totalDecompressed > MAX_DECOMPRESSED_BYTES) break;
+      }
+    } catch {}
+  }
+
+  if (xmlParts.length === 0) return null;
+
+  const combined = xmlParts.join("\n");
+  return combined.length > 100 ? combined : null;
+}
+
 async function analyzeWithPdfText(filePath: string): Promise<string> {
   const absolutePath = path.resolve(filePath);
   const fileBuffer = fs.readFileSync(absolutePath);
-  const parser = new PDFParse({ data: fileBuffer });
-  const textResult = await parser.getText();
-  const pdfText = textResult.text;
-  await parser.destroy();
+  let pdfText = "";
+  let parser: InstanceType<typeof PDFParse> | null = null;
 
-  if (!pdfText || pdfText.trim().length < 20) {
+  try {
+    parser = new PDFParse({ data: fileBuffer });
+    const textResult = await parser.getText();
+    pdfText = textResult.text || "";
+  } catch (e) {
+    console.log("[Bill Analyzer] PDF text extraction failed:", (e as Error).message);
+  } finally {
+    if (parser) {
+      try { await parser.destroy(); } catch {}
+    }
+  }
+
+  if (!pdfText || pdfText.trim().length < 50) {
+    const xfaData = extractXfaData(fileBuffer);
+    if (xfaData) {
+      console.log("[Bill Analyzer] Using XFA XML data extraction (" + xfaData.length + " chars)");
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `Here is XML data extracted from a South African municipal/utility bill PDF (XFA format). Parse the XML fields to extract billing information and return the JSON analysis.\n\n---\n${xfaData.slice(0, 12000)}\n---`,
+          },
+        ],
+        max_tokens: 2000,
+        temperature: 0.2,
+      });
+      return response.choices[0]?.message?.content || "";
+    }
+
     throw new Error("Could not extract readable text from this PDF. Try uploading an image or a clearer PDF.");
   }
 
