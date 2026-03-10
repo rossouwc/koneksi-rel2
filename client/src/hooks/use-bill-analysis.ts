@@ -15,9 +15,9 @@ export interface BillAnalysisResult {
     tariffRate?: number;
     category: string;
   };
-  overcharges: {
+  flaggedItems: {
     found: boolean;
-    items: { description: string; expectedAmount: number; chargedAmount: number; difference: number }[];
+    items: { description: string; typicalRange: string; chargedAmount: number; difference: number }[];
   };
   savings: {
     tips: { title: string; description: string; potentialSaving: number }[];

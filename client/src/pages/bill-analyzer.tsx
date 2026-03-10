@@ -387,21 +387,19 @@ function SingleResultCard({
                 )}
               </div>
 
-              {result.overcharges.found && (
-                <div className="rounded-xl p-4 border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-900/5">
+              {result.flaggedItems.found && (
+                <div className="rounded-xl p-4 border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-900/5">
                   <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="w-4 h-4 text-red-500" />
-                    <p className="text-sm font-semibold">Overcharges Detected</p>
-                    <span className="text-xs text-red-500 font-medium ml-auto">
-                      R{result.overcharges.items.reduce((s, i) => s + i.difference, 0).toFixed(2)}
-                    </span>
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <p className="text-sm font-semibold">Items Worth Reviewing</p>
                   </div>
+                  <p className="text-[10px] text-muted-foreground mb-2">These charges may be higher than typical — verify against your actual tariff schedule.</p>
                   <div className="space-y-1.5">
-                    {result.overcharges.items.map((item, i) => (
-                      <div key={i} className="text-xs p-2 rounded-lg bg-red-50 dark:bg-red-900/10" data-testid={`overcharge-${index}-${i}`}>
+                    {result.flaggedItems.items.map((item, i) => (
+                      <div key={i} className="text-xs p-2 rounded-lg bg-amber-50 dark:bg-amber-900/10" data-testid={`flagged-${index}-${i}`}>
                         <p className="font-medium">{item.description}</p>
                         <p className="text-muted-foreground mt-0.5">
-                          Expected R{item.expectedAmount.toFixed(2)} → Charged R{item.chargedAmount.toFixed(2)}
+                          Typical range: {item.typicalRange} · Your charge: R{item.chargedAmount.toFixed(2)}
                         </p>
                       </div>
                     ))}
@@ -632,7 +630,7 @@ export default function BillAnalyzerPage() {
               <div className="grid grid-cols-1 gap-2">
                 {[
                   { icon: FileText, text: "Extract provider, account, usage & amount" },
-                  { icon: AlertTriangle, text: "Detect overcharges & billing errors" },
+                  { icon: AlertTriangle, text: "Flag charges worth reviewing" },
                   { icon: Lightbulb, text: "Personalized money-saving tips" },
                   { icon: Receipt, text: "Auto-save to your expense tracker" },
                 ].map((item, i) => (

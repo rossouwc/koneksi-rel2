@@ -19,9 +19,9 @@ export interface BillAnalysisResult {
     tariffRate?: number;
     category: string;
   };
-  overcharges: {
+  flaggedItems: {
     found: boolean;
-    items: { description: string; expectedAmount: number; chargedAmount: number; difference: number }[];
+    items: { description: string; typicalRange: string; chargedAmount: number; difference: number }[];
   };
   savings: {
     tips: { title: string; description: string; potentialSaving: number }[];
@@ -44,12 +44,12 @@ Analyze the bill and return a JSON object with this EXACT structure:
     "tariffRate": 2.85,
     "category": "electricity or water or municipal"
   },
-  "overcharges": {
+  "flaggedItems": {
     "found": true,
     "items": [
       {
-        "description": "Clear description of the overcharge",
-        "expectedAmount": 100.00,
+        "description": "Why this charge may be worth reviewing — use cautious language like 'may be higher than typical' or 'worth checking against your tariff schedule'",
+        "typicalRange": "R80 - R150",
         "chargedAmount": 150.00,
         "difference": 50.00
       }
@@ -73,7 +73,7 @@ Rules:
 - usageKl: only include if water usage in kilolitres is shown
 - tariffRate: the per-unit rate if visible
 - category: must be "electricity", "water", or "municipal"
-- For overcharges: compare line items against known South African municipal tariff guidelines. Flag service charges, VAT calculations, or rates that seem excessive. If nothing suspicious, set found to false and items to an empty array.
+- For flaggedItems: only flag charges when you have reasonable grounds to believe they may be higher than typical. Use cautious, advisory language — say "may be higher than typical" or "worth checking", never state definitively that something is an overcharge. For typicalRange, provide a realistic range (e.g. "R80 - R150") rather than a single expected amount, and acknowledge that municipal tariffs vary significantly by area, property size, zoning, and tariff block. If nothing looks unusual, set found to false and items to an empty array. Err on the side of NOT flagging — only flag items where the difference is significant.
 - For savings: provide 2-5 practical tips specific to South African households. Include potential monthly savings estimates in Rands.
 - totalPotentialSaving must equal the sum of all tip potentialSaving values
 - If you cannot read parts of the bill, make reasonable estimates and note uncertainty in descriptions
@@ -103,7 +103,7 @@ async function analyzeWithImage(filePath: string): Promise<string> {
           },
           {
             type: "text",
-            text: "Analyze this South African utility bill. Extract all visible data, check for overcharges, and provide savings tips. Return the JSON analysis.",
+            text: "Analyze this South African utility bill. Extract all visible data, flag any charges worth reviewing, and provide savings tips. Return the JSON analysis.",
           },
         ],
       },
@@ -152,7 +152,7 @@ function parseAnalysisResponse(content: string): BillAnalysisResult {
 
   const parsed = JSON.parse(cleaned) as BillAnalysisResult;
 
-  if (!parsed.extracted || !parsed.overcharges || !parsed.savings) {
+  if (!parsed.extracted || !parsed.flaggedItems || !parsed.savings) {
     throw new Error("Incomplete analysis result from AI");
   }
 
