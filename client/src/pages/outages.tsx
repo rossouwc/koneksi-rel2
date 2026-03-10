@@ -54,7 +54,7 @@ const typeColors: Record<string, string> = {
 };
 
 export default function OutagesPage() {
-  const { currentEstate } = useEstate();
+  const { currentEstate, currentProperty } = useEstate();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -62,7 +62,7 @@ export default function OutagesPage() {
   const [type, setType] = useState<string>("electricity");
   const [address, setAddress] = useState("");
 
-  const outagesUrl = currentEstate ? `/api/outages?estateId=${currentEstate.id}` : "/api/outages";
+  const outagesUrl = currentEstate ? `/api/outages?estateId=${currentEstate.id}` : currentProperty ? `/api/outages?propertyId=${currentProperty.id}` : "/api/outages";
   const { data: outages = [], isLoading } = useQuery<Outage[]>({
     queryKey: [outagesUrl],
   });
@@ -93,6 +93,7 @@ export default function OutagesPage() {
       type,
       address: address || null,
       estateId: currentEstate?.id || null,
+      propertyId: currentProperty?.id || null,
     });
   };
 

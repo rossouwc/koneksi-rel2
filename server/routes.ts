@@ -355,6 +355,43 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/properties", requireAuth, async (req, res) => {
+    try {
+      const properties = await storage.getUserProperties(req.session.userId!);
+      res.json(properties);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/properties", requireAuth, async (req, res) => {
+    try {
+      const { name, streetAddress, suburb, city, province, postalCode } = req.body;
+      if (!name) return res.status(400).json({ message: "Property name is required" });
+      const property = await storage.createUserProperty({
+        userId: req.session.userId!,
+        name,
+        streetAddress: streetAddress || null,
+        suburb: suburb || null,
+        city: city || null,
+        province: province || null,
+        postalCode: postalCode || null,
+      });
+      res.json(property);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/properties/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteUserProperty(req.params.id, req.session.userId!);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/estates/join", requireAuth, async (req, res) => {
     try {
       const { inviteCode } = req.body;
@@ -452,13 +489,14 @@ export async function registerRoutes(
     try {
       const userId = req.session.userId!;
       const estateId = req.query.estateId as string | undefined;
+      const propertyId = req.query.propertyId as string | undefined;
       const memberEstateIds = await getUserEstateIds(userId);
 
       if (estateId && !memberEstateIds.includes(estateId)) {
         return res.status(403).json({ message: "Not a member of this estate" });
       }
 
-      const bills = await storage.getBillsScoped(userId, memberEstateIds, estateId);
+      const bills = await storage.getBillsScoped(userId, memberEstateIds, estateId, propertyId);
       res.json(bills);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -468,13 +506,18 @@ export async function registerRoutes(
   app.post("/api/bills", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const { estateId } = req.body;
+      const { estateId, propertyId } = req.body;
 
       if (estateId) {
         const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
         const check = await requireApprovedEstate(estateId);
         if (!check.approved) return res.status(403).json({ message: check.message });
+      }
+
+      if (propertyId) {
+        const prop = await storage.getUserProperty(propertyId);
+        if (!prop || prop.userId !== userId) return res.status(403).json({ message: "Not your property" });
       }
 
       const bill = await storage.createBill({ ...req.body, userId });
@@ -488,13 +531,14 @@ export async function registerRoutes(
     try {
       const userId = req.session.userId!;
       const estateId = req.query.estateId as string | undefined;
+      const propertyId = req.query.propertyId as string | undefined;
       const memberEstateIds = await getUserEstateIds(userId);
 
       if (estateId && !memberEstateIds.includes(estateId)) {
         return res.status(403).json({ message: "Not a member of this estate" });
       }
 
-      const outages = await storage.getOutagesScoped(userId, memberEstateIds, estateId);
+      const outages = await storage.getOutagesScoped(userId, memberEstateIds, estateId, propertyId);
       res.json(outages);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -504,13 +548,18 @@ export async function registerRoutes(
   app.post("/api/outages", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const { estateId } = req.body;
+      const { estateId, propertyId } = req.body;
 
       if (estateId) {
         const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
         const check = await requireApprovedEstate(estateId);
         if (!check.approved) return res.status(403).json({ message: check.message });
+      }
+
+      if (propertyId) {
+        const prop = await storage.getUserProperty(propertyId);
+        if (!prop || prop.userId !== userId) return res.status(403).json({ message: "Not your property" });
       }
 
       const outage = await storage.createOutage({ ...req.body, userId });
@@ -523,13 +572,19 @@ export async function registerRoutes(
   app.post("/api/bills/analyze", requireAuth, upload.single("bill"), async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const { estateId } = req.body;
+      const { estateId, propertyId } = req.body;
 
       if (estateId && estateId !== "null") {
         const isMember = await verifyEstateMembership(userId, estateId);
         if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
         const check = await requireApprovedEstate(estateId);
         if (!check.approved) return res.status(403).json({ message: check.message });
+      }
+
+      const validPropertyId = propertyId && propertyId !== "null" ? propertyId : null;
+      if (validPropertyId) {
+        const prop = await storage.getUserProperty(validPropertyId);
+        if (!prop || prop.userId !== userId) return res.status(403).json({ message: "Not your property" });
       }
 
       if (!req.file) {
@@ -552,6 +607,7 @@ export async function registerRoutes(
       const bill = await storage.createBill({
         userId,
         estateId: estateId && estateId !== "null" ? estateId : null,
+        propertyId: validPropertyId,
         title: `${analysis.extracted.provider} - ${analysis.extracted.billingPeriod}`,
         amount: Math.round(analysis.extracted.totalAmount * 100),
         category: analysis.extracted.category,

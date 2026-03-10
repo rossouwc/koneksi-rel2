@@ -37,11 +37,12 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `client/src/pages/supplier-billing.tsx` - Billing page fetches tiers from /api/supplier/dashboard (monthlyPrice in cents, display as R{price/100})
 
 ## Multi-Tenant Architecture
-- Estate selector in header with "Personal" option (no estate) + all user's estates
-- `current_estate_id` persisted in localStorage, `__personal__` sentinel for personal mode
+- Estate selector in header with "Personal" option (no estate) + estates + standalone properties
+- `current_estate_id` persisted in localStorage: `__personal__` sentinel for personal mode, `prop_{id}` prefix for property mode, else estate ID
 - All data queries scoped: estate-specific data only visible to estate members
-- Personal data (estateId IS NULL) only visible to the owner
-- Storage layer uses `getBillsScoped`, `getOutagesScoped`, `getProvidersScoped` for RLS enforcement
+- Personal data (estateId IS NULL, propertyId IS NULL) only visible to the owner
+- Property data scoped by propertyId to the owning user
+- Storage layer uses `getBillsScoped`, `getOutagesScoped`, `getProvidersScoped` for RLS enforcement (support estateId + propertyId params)
 - Routes verify estate membership before allowing read/write operations
 
 ## Data Model
@@ -53,8 +54,9 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
   - approvalStatus: "approved" (default for estate_admin creators), "pending" (default for residents joining via invite code)
   - Estate admins must approve pending residents before they can access estate data
   - `verifyEstateMembership` checks both link existence AND approvalStatus === "approved"
-- **bills** - userId, estateId, title, amount (cents), dueDate, category, status, provider, billingPeriod, accountNumber, usageKwh (whole kWh), usageKl (kL × 10 for 1dp precision), tariffRate (cents)
-- **outages** - userId, estateId, type (electricity/water/internet/gas/other), title, description, status
+- **userProperties** - id (UUID), userId, name, streetAddress, suburb, city, province, postalCode, createdAt (standalone residential addresses not in any estate)
+- **bills** - userId, estateId, propertyId (nullable), title, amount (cents), dueDate, category, status, provider, billingPeriod, accountNumber, usageKwh (whole kWh), usageKl (kL × 10 for 1dp precision), tariffRate (cents)
+- **outages** - userId, estateId, propertyId (nullable), type (electricity/water/internet/gas/other), title, description, status
 - **providers** - estateId, createdBy, name, category, phone, whatsapp, email, website, description
 - **reviews** - providerId, userId, rating, comment
 - **subscriptionTiers** - id, name, monthlyPrice (cents), maxEstates, scopeType (estate/city/province/national), description, sortOrder
@@ -68,7 +70,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `/bills` - Bill management with add dialog
 - `/outages` - Outage reporting and tracking
 - `/providers` - Service providers directory: searchable + filterable (category, rating), provider detail view with reviews + reviewer names, review submission with star ratings, phone/WhatsApp/email/website contact buttons
-- `/join-estate` - Join estate via invite code + view current estates + create estate (admin only)
+- `/join-estate` - Join estate via invite code + view current estates + manage standalone properties + create estate (admin only)
 - `/bill-analyzer` - AI-powered bill analysis: drag-drop/camera upload, hardcoded sample analysis, results cards (extracted data, overcharges, savings tips), saves to bills table
 - `/alerts` - Outage alerts with Leaflet map view, list view, FAB to report, photo upload, type filtering, polling
 - `/marketplace` - Product marketplace: responsive grid of estate/home products (water tanks, solar gear, security, etc.), category chips, search, product cards with images/pricing/badges, "View Deal" affiliate buttons

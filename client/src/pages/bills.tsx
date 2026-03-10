@@ -60,7 +60,7 @@ function getCategoryMeta(cat: string) {
 }
 
 export default function BillsPage() {
-  const { currentEstate } = useEstate();
+  const { currentEstate, currentProperty } = useEstate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export default function BillsPage() {
   const [category, setCategory] = useState("");
   const [dueDate, setDueDate] = useState("");
 
-  const billsUrl = currentEstate ? `/api/bills?estateId=${currentEstate.id}` : "/api/bills";
+  const billsUrl = currentEstate ? `/api/bills?estateId=${currentEstate.id}` : currentProperty ? `/api/bills?propertyId=${currentProperty.id}` : "/api/bills";
   const { data: bills = [], isLoading } = useQuery<Bill[]>({
     queryKey: [billsUrl],
   });
@@ -101,6 +101,7 @@ export default function BillsPage() {
       category: category || null,
       dueDate: dueDate || null,
       estateId: currentEstate?.id || null,
+      propertyId: currentProperty?.id || null,
     });
   };
 

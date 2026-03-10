@@ -40,7 +40,7 @@ interface AnalysisBatchResult {
 }
 
 export function useBillAnalysis() {
-  const { currentEstate } = useEstate();
+  const { currentEstate, currentProperty } = useEstate();
   const { toast } = useToast();
   const [batchResult, setBatchResult] = useState<AnalysisBatchResult | null>(null);
   const [fileStatuses, setFileStatuses] = useState<FileAnalysisStatus[]>([]);
@@ -62,6 +62,9 @@ export function useBillAnalysis() {
           const formData = new FormData();
           formData.append("bill", statuses[i].file);
           formData.append("estateId", currentEstate?.id || "null");
+          if (currentProperty) {
+            formData.append("propertyId", currentProperty.id);
+          }
 
           const res = await fetch("/api/bills/analyze", {
             method: "POST",
@@ -96,6 +99,9 @@ export function useBillAnalysis() {
       queryClient.invalidateQueries({ queryKey: ["/api/bills"] });
       if (currentEstate) {
         queryClient.invalidateQueries({ queryKey: [`/api/bills?estateId=${currentEstate.id}`] });
+      }
+      if (currentProperty) {
+        queryClient.invalidateQueries({ queryKey: [`/api/bills?propertyId=${currentProperty.id}`] });
       }
       if (data.successCount > 0) {
         toast({

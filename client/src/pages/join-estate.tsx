@@ -24,6 +24,8 @@ import {
   CheckCircle2,
   Plus,
   MapPin,
+  Home,
+  Trash2,
 } from "lucide-react";
 
 function CreateEstateDialog() {
@@ -147,15 +149,173 @@ function CreateEstateDialog() {
   );
 }
 
+function AddPropertyDialog() {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [propName, setPropName] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
+  const [propSuburb, setPropSuburb] = useState("");
+  const [propCity, setPropCity] = useState("");
+  const [propProvince, setPropProvince] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/properties", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      setOpen(false);
+      setPropName("");
+      setStreetAddress("");
+      setPropSuburb("");
+      setPropCity("");
+      setPropProvince("");
+      setPostalCode("");
+      toast({ title: "Property added", description: "Your property has been added successfully." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <motion.div whileTap={{ scale: 0.98 }}>
+          <Button
+            variant="outline"
+            data-testid="button-add-property"
+            className="w-full rounded-xl py-6 border-dashed border-2 text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add a Property
+          </Button>
+        </motion.div>
+      </DialogTrigger>
+      <DialogContent className="rounded-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Home className="w-5 h-5 text-primary" />
+            Add a Property
+          </DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            createMutation.mutate({
+              name: propName,
+              streetAddress: streetAddress || null,
+              suburb: propSuburb || null,
+              city: propCity || null,
+              province: propProvince || null,
+              postalCode: postalCode || null,
+            });
+          }}
+          className="space-y-4"
+        >
+          <div>
+            <Label className="text-sm">Property Name</Label>
+            <Input
+              data-testid="input-property-name"
+              value={propName}
+              onChange={(e) => setPropName(e.target.value)}
+              placeholder="e.g. My Townhouse"
+              className="rounded-lg mt-1.5"
+              required
+            />
+          </div>
+          <div>
+            <Label className="text-sm">Street Address</Label>
+            <Input
+              data-testid="input-property-street"
+              value={streetAddress}
+              onChange={(e) => setStreetAddress(e.target.value)}
+              placeholder="e.g. 12 Oak Lane"
+              className="rounded-lg mt-1.5"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Suburb</Label>
+              <Input
+                data-testid="input-property-suburb"
+                value={propSuburb}
+                onChange={(e) => setPropSuburb(e.target.value)}
+                placeholder="e.g. Sandton"
+                className="rounded-lg mt-1.5"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">City</Label>
+              <Input
+                data-testid="input-property-city"
+                value={propCity}
+                onChange={(e) => setPropCity(e.target.value)}
+                placeholder="e.g. Johannesburg"
+                className="rounded-lg mt-1.5"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Province</Label>
+              <Input
+                data-testid="input-property-province"
+                value={propProvince}
+                onChange={(e) => setPropProvince(e.target.value)}
+                placeholder="e.g. Gauteng"
+                className="rounded-lg mt-1.5"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Postal Code</Label>
+              <Input
+                data-testid="input-property-postal"
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                placeholder="e.g. 2196"
+                className="rounded-lg mt-1.5"
+              />
+            </div>
+          </div>
+          <Button
+            type="submit"
+            className="w-full rounded-xl gradient-teal text-white"
+            disabled={createMutation.isPending}
+            data-testid="button-submit-property"
+          >
+            {createMutation.isPending ? "Adding..." : "Add Property"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function JoinEstatePage() {
   const { user } = useAuth();
-  const { setCurrentEstate, approvedEstates, pendingEstates } = useEstate();
+  const { setCurrentEstate, setCurrentProperty, approvedEstates, pendingEstates, properties } = useEstate();
   const joinEstate = useJoinEstate();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [inviteCode, setInviteCode] = useState("");
 
   const isAdmin = user?.isSuperAdmin || user?.role === "super_admin";
+
+  const deletePropertyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/properties/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      toast({ title: "Property removed" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -306,11 +466,63 @@ export default function JoinEstatePage() {
         </motion.div>
       )}
 
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted-foreground uppercase tracking-wider">Your Properties</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        {properties.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {properties.map((prop) => (
+              <div
+                key={prop.id}
+                data-testid={`property-card-${prop.id}`}
+                className="w-full glass-card rounded-xl p-4 flex items-center gap-3"
+              >
+                <button
+                  onClick={() => {
+                    setCurrentProperty(prop);
+                    setLocation("/");
+                  }}
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Home className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">{prop.name}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3 h-3" />
+                      {[prop.streetAddress, prop.suburb, prop.city].filter(Boolean).join(", ") || "No address"}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  data-testid={`button-delete-property-${prop.id}`}
+                  onClick={() => deletePropertyMutation.mutate(prop.id)}
+                  className="text-muted-foreground hover:text-red-500 transition-colors p-1 flex-shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <AddPropertyDialog />
+      </motion.div>
+
       {isAdmin && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.4 }}
+          transition={{ delay: 0.35, duration: 0.4 }}
         >
           <div className="flex items-center gap-3 mb-3">
             <div className="flex-1 h-px bg-border" />

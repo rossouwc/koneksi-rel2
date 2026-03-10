@@ -23,6 +23,7 @@ import {
   Plus,
   Bell,
   Briefcase,
+  Home,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,7 @@ import {
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 
 const PERSONAL_VALUE = "__personal__";
+const PROPERTY_PREFIX = "prop_";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -142,7 +144,7 @@ function AvatarDropdown() {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
-  const { currentEstate, approvedEstates, setCurrentEstate, pendingEstates } = useEstate();
+  const { currentEstate, currentProperty, approvedEstates, properties, selectById, pendingEstates } = useEstate();
   const { theme, toggleTheme } = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -219,21 +221,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             <div className="flex items-center gap-2">
               <Select
-                value={currentEstate?.id || PERSONAL_VALUE}
-                onValueChange={(val) => {
-                  if (val === PERSONAL_VALUE) {
-                    setCurrentEstate(null);
-                  } else {
-                    const estate = approvedEstates.find((e) => e.id === val);
-                    if (estate) setCurrentEstate(estate);
-                  }
-                }}
+                value={currentProperty ? PROPERTY_PREFIX + currentProperty.id : currentEstate?.id || PERSONAL_VALUE}
+                onValueChange={(val) => selectById(val)}
               >
                 <SelectTrigger
                   data-testid="select-estate"
                   className="w-[140px] md:w-[180px] rounded-lg text-xs md:text-sm h-9"
                 >
-                  <SelectValue placeholder="Select estate" />
+                  <SelectValue placeholder="Select scope" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={PERSONAL_VALUE} data-testid="estate-option-personal">
@@ -242,11 +237,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       Personal
                     </span>
                   </SelectItem>
-                  {approvedEstates.map((e) => (
-                    <SelectItem key={e.id} value={e.id} data-testid={`estate-option-${e.id}`}>
-                      {e.name}
-                    </SelectItem>
-                  ))}
+                  {approvedEstates.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Estates</div>
+                      {approvedEstates.map((e) => (
+                        <SelectItem key={e.id} value={e.id} data-testid={`estate-option-${e.id}`}>
+                          <span className="flex items-center gap-2">
+                            <Building2 className="w-3.5 h-3.5" />
+                            {e.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {properties.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Properties</div>
+                      {properties.map((p) => (
+                        <SelectItem key={p.id} value={PROPERTY_PREFIX + p.id} data-testid={`property-option-${p.id}`}>
+                          <span className="flex items-center gap-2">
+                            <Home className="w-3.5 h-3.5" />
+                            {p.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
 

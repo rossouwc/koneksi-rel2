@@ -51,6 +51,7 @@ export const bills = pgTable("bills", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   estateId: varchar("estate_id"),
+  propertyId: varchar("property_id"),
   title: text("title").notNull(),
   amount: integer("amount"),
   dueDate: text("due_date"),
@@ -71,6 +72,7 @@ export const outages = pgTable("outages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
   estateId: varchar("estate_id"),
+  propertyId: varchar("property_id"),
   type: outageTypeEnum("type").notNull(),
   title: text("title").notNull(),
   description: text("description"),
@@ -94,6 +96,18 @@ export const providers = pgTable("providers", {
   website: text("website"),
   description: text("description"),
   services: text("services").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userProperties = pgTable("user_properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  streetAddress: text("street_address"),
+  suburb: text("suburb"),
+  city: text("city"),
+  province: text("province"),
+  postalCode: text("postal_code"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -157,6 +171,7 @@ export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, c
 export const insertSubscriptionTierSchema = createInsertSchema(subscriptionTiers).omit({ id: true });
 export const insertProviderSubscriptionSchema = createInsertSchema(providerSubscriptions).omit({ id: true, startedAt: true });
 export const insertProviderVisibleEstateSchema = createInsertSchema(providerVisibleEstates).omit({ id: true });
+export const insertUserPropertySchema = createInsertSchema(userProperties).omit({ id: true, createdAt: true });
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -216,3 +231,5 @@ export type ProviderSubscription = typeof providerSubscriptions.$inferSelect;
 export type InsertProviderSubscription = z.infer<typeof insertProviderSubscriptionSchema>;
 export type ProviderVisibleEstate = typeof providerVisibleEstates.$inferSelect;
 export type InsertProviderVisibleEstate = z.infer<typeof insertProviderVisibleEstateSchema>;
+export type UserProperty = typeof userProperties.$inferSelect;
+export type InsertUserProperty = z.infer<typeof insertUserPropertySchema>;

@@ -69,13 +69,14 @@ function StatCard({
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { currentEstate, isEstateAdmin } = useEstate();
+  const { currentEstate, currentProperty, isEstateAdmin } = useEstate();
   const { toast } = useToast();
 
-  const estateParam = currentEstate ? `?estateId=${currentEstate.id}` : "";
+  const scopeParam = currentEstate ? `?estateId=${currentEstate.id}` : currentProperty ? `?propertyId=${currentProperty.id}` : "";
+  const estateParam = scopeParam;
 
-  const billsUrl = currentEstate ? `/api/bills?estateId=${currentEstate.id}` : "/api/bills";
-  const outagesUrl = currentEstate ? `/api/outages?estateId=${currentEstate.id}` : "/api/outages";
+  const billsUrl = `/api/bills${scopeParam}`;
+  const outagesUrl = `/api/outages${scopeParam}`;
   const providersUrl = currentEstate ? `/api/providers?estateId=${currentEstate.id}` : "/api/providers";
 
   const { data: bills = [], isLoading: billsLoading } = useQuery<Bill[]>({
