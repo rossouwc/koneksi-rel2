@@ -377,23 +377,30 @@ function CategoryCard({ categoryData }: { categoryData: CategoryData }) {
 }
 
 export function SavingsTracker() {
-  const { currentEstate } = useEstate();
+  const { currentEstate, currentProperty } = useEstate();
   const [viewMode, setViewMode] = useState<"personal" | "estate">(currentEstate ? "estate" : "personal");
 
   const personalUrl = "/api/bills";
   const estateUrl = currentEstate ? `/api/bills?estateId=${currentEstate.id}` : null;
+  const propertyUrl = currentProperty ? `/api/bills?propertyId=${currentProperty.id}` : null;
 
   const { data: personalBills = [], isLoading: personalLoading } = useQuery<Bill[]>({
     queryKey: [personalUrl],
+    enabled: !currentProperty,
   });
 
   const { data: estateBills = [], isLoading: estateLoading } = useQuery<Bill[]>({
     queryKey: [estateUrl!],
-    enabled: !!estateUrl,
+    enabled: !!estateUrl && !currentProperty,
   });
 
-  const isLoading = viewMode === "personal" ? personalLoading : estateLoading;
-  const activeBills = viewMode === "estate" && currentEstate ? estateBills : personalBills;
+  const { data: propertyBills = [], isLoading: propertyLoading } = useQuery<Bill[]>({
+    queryKey: [propertyUrl!],
+    enabled: !!propertyUrl,
+  });
+
+  const isLoading = currentProperty ? propertyLoading : viewMode === "personal" ? personalLoading : estateLoading;
+  const activeBills = currentProperty ? propertyBills : viewMode === "estate" && currentEstate ? estateBills : personalBills;
 
   const expenseData = useMemo(() => parseExpenseData(activeBills), [activeBills]);
 
@@ -417,7 +424,7 @@ export function SavingsTracker() {
           <Wallet className="w-5 h-5 text-primary" />
           Expense Tracker
         </h2>
-        {currentEstate && (
+        {currentEstate && !currentProperty && (
           <div className="flex rounded-xl overflow-hidden border border-border/60" data-testid="toggle-expense-mode">
             <Button
               variant={viewMode === "personal" ? "default" : "ghost"}
@@ -480,7 +487,7 @@ export function SavingsTracker() {
               <div className="flex items-center gap-1.5 mb-1">
                 {isSaving ? <TrendingDown className="w-3.5 h-3.5 text-emerald-500" /> : hasSavings ? <TrendingUp className="w-3.5 h-3.5 text-red-500" /> : <Minus className="w-3.5 h-3.5 text-muted-foreground" />}
                 <span className={`text-xs font-medium uppercase tracking-wider ${isSaving ? "text-emerald-600 dark:text-emerald-400" : hasSavings ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
-                  {viewMode === "estate" && currentEstate ? `${currentEstate.name}` : "Your Expenses"}
+                  {currentProperty ? currentProperty.name : viewMode === "estate" && currentEstate ? `${currentEstate.name}` : "Your Expenses"}
                 </span>
               </div>
               <div className="flex items-end gap-3">
