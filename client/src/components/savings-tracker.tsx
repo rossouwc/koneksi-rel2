@@ -43,10 +43,12 @@ interface CategoryData {
     amount: number;
     provider: string | null;
     billingPeriod: string | null;
+    periodLabel: string;
     usageKwh: number | null;
     usageKl: number | null;
     tariffRate: number | null;
     date: Date;
+    periodDate: Date;
   }[];
   totalSaving: number;
   latestAmount: number;
@@ -64,6 +66,30 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: type
   water: { label: "Water", color: "#3b82f6", icon: Droplets },
   municipal: { label: "Municipal", color: "#10b981", icon: Receipt },
 };
+
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+  apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+  aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
+  nov: 10, november: 10, dec: 11, december: 11,
+};
+
+function parseBillingPeriodDate(periodStr: string | null): Date | null {
+  if (!periodStr) return null;
+  const parts = periodStr.split(/\s*[-–—]\s*/);
+  const target = parts.length > 1 ? parts[parts.length - 1].trim() : parts[0].trim();
+  const tokens = target.match(/([A-Za-z]+)\s*(\d{4})/);
+  if (!tokens) return null;
+  const monthIdx = MONTH_MAP[tokens[1].toLowerCase()];
+  const year = parseInt(tokens[2], 10);
+  if (monthIdx === undefined || isNaN(year)) return null;
+  return new Date(year, monthIdx, 1);
+}
+
+function formatPeriodLabel(date: Date): string {
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[date.getMonth()]} '${String(date.getFullYear()).slice(2)}`;
+}
 
 function parseExpenseData(bills: Bill[]): ExpenseData {
   const analyzed = bills.filter((b) => b.analysisResult && b.amount);
@@ -91,16 +117,25 @@ function parseExpenseData(bills: Bill[]): ExpenseData {
       } catch {}
     }
 
+    const createdDate = bill.createdAt ? new Date(bill.createdAt) : new Date();
+    const parsedPeriod = parseBillingPeriodDate(billingPeriod);
+    const periodDate = parsedPeriod || createdDate;
+    const periodLabel = parsedPeriod
+      ? formatPeriodLabel(parsedPeriod)
+      : createdDate.toLocaleDateString("en-ZA", { month: "short", year: "2-digit" });
+
     categoryMap.get(cat)!.push({
       id: bill.id,
       title: bill.title,
       amount: bill.amount!,
       provider,
       billingPeriod,
+      periodLabel,
       usageKwh,
       usageKl,
       tariffRate,
-      date: bill.createdAt ? new Date(bill.createdAt) : new Date(),
+      date: createdDate,
+      periodDate,
     });
   }
 
@@ -108,7 +143,7 @@ function parseExpenseData(bills: Bill[]): ExpenseData {
   let totalActualSaving = 0;
 
   for (const [category, catBills] of categoryMap.entries()) {
-    catBills.sort((a, b) => a.date.getTime() - b.date.getTime());
+    catBills.sort((a, b) => a.periodDate.getTime() - b.periodDate.getTime());
 
     let categorySaving = 0;
     for (let i = 1; i < catBills.length; i++) {
@@ -147,7 +182,7 @@ function SpendingChart({ categoryData }: { categoryData: CategoryData }) {
   const config = CATEGORY_CONFIG[categoryData.category] || { label: categoryData.category, color: "#6b7280", icon: Receipt };
 
   const chartData = categoryData.bills.map((bill) => ({
-    period: bill.billingPeriod || bill.date.toLocaleDateString("en-ZA", { month: "short", year: "2-digit" }),
+    period: bill.periodLabel,
     amount: bill.amount / 100,
     usageKwh: bill.usageKwh || undefined,
     usageKl: bill.usageKl != null ? bill.usageKl / 10 : undefined,
@@ -310,7 +345,7 @@ function CategoryCard({ categoryData }: { categoryData: CategoryData }) {
                     {[...categoryData.bills].reverse().map((bill, i) => (
                       <div key={bill.id} className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-muted/20" data-testid={`history-bill-${bill.id}`}>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium truncate">{bill.billingPeriod || bill.title}</p>
+                          <p className="text-xs font-medium truncate">{bill.periodLabel}</p>
                           <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
                             {bill.usageKwh && <span className="flex items-center gap-0.5"><Zap className="w-2.5 h-2.5" />{bill.usageKwh} kWh</span>}
                             {bill.usageKl != null && <span className="flex items-center gap-0.5"><Droplets className="w-2.5 h-2.5" />{(bill.usageKl / 10).toFixed(1)} kL</span>}
