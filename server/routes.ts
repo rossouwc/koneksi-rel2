@@ -1406,6 +1406,19 @@ export async function registerRoutes(
         return res.status(409).json({ message: "Supplier is already approved" });
       }
       await db.update(users).set({ approvalStatus: "approved" }).where(eq(users.id, supplier.id));
+
+      const existingProviders = await storage.getProvidersByUserId(supplier.id);
+      if (existingProviders.length === 0) {
+        await storage.createProvider({
+          name: supplier.businessName || supplier.fullName,
+          category: (supplier.services && supplier.services.length > 0) ? supplier.services[0].toLowerCase() : "other",
+          phone: supplier.phone || null,
+          email: supplier.email,
+          createdBy: supplier.id,
+          services: supplier.services || null,
+          providerApprovalStatus: "approved",
+        });
+      }
       res.json({ message: "Supplier approved" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
