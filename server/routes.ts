@@ -758,33 +758,46 @@ export async function registerRoutes(
   app.post("/api/providers/recommend", requireAuth, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const { estateId, name, category, phone, whatsapp, email, website, description, services } = req.body;
-      if (!estateId || !name || !category) {
-        return res.status(400).json({ message: "Estate, name, and category are required" });
+      const { estateId, providerId } = req.body;
+      if (!estateId || !providerId) {
+        return res.status(400).json({ message: "Estate and provider are required" });
       }
       const isMember = await verifyEstateMembership(userId, estateId);
       if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
 
-      let safeWebsite = website || null;
-      if (safeWebsite && !/^https?:\/\//i.test(safeWebsite)) {
-        safeWebsite = `https://${safeWebsite}`;
+      const existingProvider = await storage.getProvider(providerId);
+      if (!existingProvider || existingProvider.providerApprovalStatus !== "approved") {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+      if (!existingProvider.createdBy) {
+        return res.status(400).json({ message: "This provider cannot be recommended" });
       }
 
-      const provider = await storage.createProvider({
+      const alreadyVisible = await storage.getVisibleProviders(estateId);
+      if (alreadyVisible.some((p) => p.name.toLowerCase() === existingProvider.name.toLowerCase())) {
+        return res.status(400).json({ message: "This provider is already available in your estate" });
+      }
+
+      const pendingInEstate = await storage.getPendingProviders(estateId);
+      if (pendingInEstate.some((p) => p.name.toLowerCase() === existingProvider.name.toLowerCase())) {
+        return res.status(400).json({ message: "This provider has already been recommended and is pending approval" });
+      }
+
+      const recommendation = await storage.createProvider({
         estateId,
-        createdBy: null,
-        name,
-        category,
-        phone: phone || null,
-        whatsapp: whatsapp || null,
-        email: email || null,
-        website: safeWebsite,
-        description: description || null,
-        services: services || null,
+        createdBy: existingProvider.createdBy,
+        name: existingProvider.name,
+        category: existingProvider.category,
+        phone: existingProvider.phone || null,
+        whatsapp: existingProvider.whatsapp || null,
+        email: existingProvider.email || null,
+        website: existingProvider.website || null,
+        description: existingProvider.description || null,
+        services: existingProvider.services || null,
         providerApprovalStatus: "pending",
         recommendedBy: userId,
       });
-      res.json(provider);
+      res.json(recommendation);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -863,6 +876,26 @@ export async function registerRoutes(
       }
       await storage.rejectProvider(providerId);
       res.json({ message: "Provider rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/estates/:id/available-providers", requireAuth, async (req, res) => {
+    try {
+      const estateId = req.params.id;
+      const isMember = await verifyEstateMembership(req.session.userId!, estateId);
+      if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
+      const allProviders = await storage.getAllRegisteredProviders();
+      const alreadyVisible = await storage.getVisibleProviders(estateId);
+      const alreadyNames = new Set(alreadyVisible.map((p) => p.name.toLowerCase()));
+      const pendingInEstate = await storage.getPendingProviders(estateId);
+      const pendingNames = new Set(pendingInEstate.map((p) => p.name.toLowerCase()));
+      const filtered = allProviders.filter((p) => {
+        const nameLower = p.name.toLowerCase();
+        return !alreadyNames.has(nameLower) && !pendingNames.has(nameLower) && p.estateId !== estateId;
+      });
+      res.json(filtered);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

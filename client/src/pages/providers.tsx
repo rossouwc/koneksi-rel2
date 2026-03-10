@@ -30,6 +30,7 @@ import {
   Send,
   Shield,
   Inbox,
+  Loader2,
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { Button } from "@/components/ui/button";
@@ -1250,6 +1251,8 @@ export default function ProvidersPage() {
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [adminTab, setAdminTab] = useState<"pending" | "browse" | "invitations">("pending");
 
+  const [recommendSearch, setRecommendSearch] = useState("");
+
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [phone, setPhone] = useState("");
@@ -1285,6 +1288,17 @@ export default function ProvidersPage() {
     enabled: !!currentEstate?.id && isEstateAdmin,
   });
 
+  const { data: availableProviders = [], isLoading: availableLoading } = useQuery<Provider[]>({
+    queryKey: ["/api/estates", currentEstate?.id, "available-providers"],
+    queryFn: async () => {
+      if (!currentEstate?.id) return [];
+      const res = await fetch(`/api/estates/${currentEstate.id}/available-providers`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentEstate?.id && recommendDialogOpen && !isEstateAdmin,
+  });
+
   const resetForm = () => {
     setName("");
     setCategory("");
@@ -1298,14 +1312,15 @@ export default function ProvidersPage() {
   };
 
   const recommendMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: { estateId: string; providerId: string }) => {
       await apiRequest("POST", "/api/providers/recommend", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [providersUrl] });
       queryClient.invalidateQueries({ queryKey: ["/api/estates", currentEstate?.id, "pending-providers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/estates", currentEstate?.id, "available-providers"] });
       setRecommendDialogOpen(false);
-      resetForm();
+      setRecommendSearch("");
       toast({ title: "Provider recommended", description: "Your recommendation has been sent to the estate admin for approval." });
     },
     onError: (err: any) => {
@@ -1346,34 +1361,20 @@ export default function ProvidersPage() {
     },
   });
 
-  const handleRecommendSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isEstateAdmin) {
-      createDirectMutation.mutate({
-        name,
-        category,
-        phone: phone || null,
-        whatsapp: whatsapp || null,
-        email: email || null,
-        website: website || null,
-        description: description || null,
-        services: providerServices.length > 0 ? providerServices : null,
-        estateId: currentEstate?.id || null,
-      });
-    } else {
-      recommendMutation.mutate({
-        name,
-        category,
-        phone: phone || null,
-        whatsapp: whatsapp || null,
-        email: email || null,
-        website: website || null,
-        description: description || null,
-        services: providerServices.length > 0 ? providerServices : null,
-        estateId: currentEstate?.id,
-      });
-    }
+  const handleRecommendProvider = (providerId: string) => {
+    if (!currentEstate?.id) return;
+    recommendMutation.mutate({ estateId: currentEstate.id, providerId });
   };
+
+  const filteredAvailableProviders = availableProviders.filter((p) => {
+    const q = recommendSearch.toLowerCase();
+    if (!q) return true;
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.category.toLowerCase().includes(q) ||
+      (p.services && p.services.some((s) => s.toLowerCase().includes(q)))
+    );
+  });
 
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1528,56 +1529,91 @@ export default function ProvidersPage() {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={recommendDialogOpen} onOpenChange={setRecommendDialogOpen}>
+            <Dialog open={recommendDialogOpen} onOpenChange={(open) => { setRecommendDialogOpen(open); if (!open) setRecommendSearch(""); }}>
               <DialogTrigger asChild>
                 <Button className="rounded-xl gradient-teal text-white text-sm gap-1.5" data-testid="button-recommend-provider">
-                  {isEstateAdmin ? (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      Add Provider
-                    </>
-                  ) : (
-                    <>
-                      <ThumbsUp className="w-4 h-4" />
-                      Recommend
-                    </>
-                  )}
+                  <ThumbsUp className="w-4 h-4" />
+                  Recommend
                 </Button>
               </DialogTrigger>
-              <DialogContent className="rounded-2xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="rounded-2xl max-h-[85vh] flex flex-col">
                 <DialogHeader>
-                  <DialogTitle>{isEstateAdmin ? "Add Provider" : "Recommend a Provider"}</DialogTitle>
+                  <DialogTitle>Recommend a Provider</DialogTitle>
                 </DialogHeader>
-                {!isEstateAdmin && (
-                  <p className="text-sm text-muted-foreground -mt-1">
-                    Your recommendation will be sent to the estate admin for approval.
-                  </p>
-                )}
-                <form onSubmit={handleRecommendSubmit} className="space-y-4 mt-1">
-                  <ProviderFormFields
-                    name={name} setName={setName}
-                    category={category} setCategory={setCategory}
-                    phone={phone} setPhone={setPhone}
-                    whatsapp={whatsapp} setWhatsapp={setWhatsapp}
-                    email={email} setEmail={setEmail}
-                    website={website} setWebsite={setWebsite}
-                    description={description} setDescription={setDescription}
-                    providerServices={providerServices} setProviderServices={setProviderServices}
-                    showProviderServicesDrop={showProviderServicesDrop} setShowProviderServicesDrop={setShowProviderServicesDrop}
+                <p className="text-sm text-muted-foreground -mt-1">
+                  Search for a registered provider to recommend to your estate. Your recommendation will be sent to the estate admin for approval.
+                </p>
+                <div className="relative mt-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, category, or service..."
+                    value={recommendSearch}
+                    onChange={(e) => setRecommendSearch(e.target.value)}
+                    className="pl-9 rounded-xl"
+                    data-testid="input-recommend-search"
                   />
-                  <Button
-                    type="submit"
-                    className="w-full rounded-xl gradient-teal text-white"
-                    disabled={recommendMutation.isPending || createDirectMutation.isPending}
-                    data-testid="button-submit-provider"
-                  >
-                    {(recommendMutation.isPending || createDirectMutation.isPending)
-                      ? "Submitting..."
-                      : isEstateAdmin
-                        ? "Add Provider"
-                        : "Submit Recommendation"}
-                  </Button>
-                </form>
+                </div>
+                <div className="flex-1 overflow-y-auto mt-2 space-y-2 min-h-0 max-h-[50vh]">
+                  {availableLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : filteredAvailableProviders.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      {recommendSearch ? "No matching providers found." : "No additional providers available to recommend."}
+                    </div>
+                  ) : (
+                    filteredAvailableProviders.map((p) => {
+                      const icon = categoryIcons[p.category.toLowerCase()] || "📋";
+                      const pReviews = getProviderReviews(p.id);
+                      const avg = getAverageRating(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all"
+                          data-testid={`recommend-provider-${p.id}`}
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-50 to-emerald-100 dark:from-teal-900/40 dark:to-emerald-900/30 flex items-center justify-center text-base flex-shrink-0">
+                            {icon}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm truncate">{p.name}</h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary capitalize">
+                                {p.category}
+                              </span>
+                              {avg > 0 && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                                  {avg.toFixed(1)} ({pReviews.length})
+                                </span>
+                              )}
+                            </div>
+                            {p.services && p.services.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {p.services.slice(0, 3).map((s) => (
+                                  <span key={s} className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{s}</span>
+                                ))}
+                                {p.services.length > 3 && (
+                                  <span className="text-[9px] text-muted-foreground">+{p.services.length - 3}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            className="rounded-lg gradient-teal text-white text-xs h-8 px-3 flex-shrink-0"
+                            disabled={recommendMutation.isPending}
+                            onClick={() => handleRecommendProvider(p.id)}
+                            data-testid={`button-recommend-${p.id}`}
+                          >
+                            {recommendMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Recommend"}
+                          </Button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </DialogContent>
             </Dialog>
           </div>
