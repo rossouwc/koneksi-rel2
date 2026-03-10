@@ -910,8 +910,13 @@ export async function registerRoutes(
       }
       const allProviders = await storage.getAllRegisteredProviders();
       const alreadyVisible = await storage.getVisibleProviders(estateId);
-      const alreadyIds = new Set(alreadyVisible.map((p) => p.id));
-      const filtered = allProviders.filter((p) => !alreadyIds.has(p.id) && p.estateId !== estateId);
+      const alreadyNames = new Set(alreadyVisible.map((p) => p.name.toLowerCase()));
+      const pendingInEstate = await storage.getPendingProviders(estateId);
+      const pendingNames = new Set(pendingInEstate.map((p) => p.name.toLowerCase()));
+      const filtered = allProviders.filter((p) => {
+        const nameLower = p.name.toLowerCase();
+        return !alreadyNames.has(nameLower) && !pendingNames.has(nameLower) && p.estateId !== estateId;
+      });
       res.json(filtered);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -928,6 +933,10 @@ export async function registerRoutes(
       const provider = await storage.getProvider(providerId);
       if (!provider || provider.providerApprovalStatus !== "approved") {
         return res.status(404).json({ message: "Provider not found or not approved" });
+      }
+      const alreadyVisible = await storage.getVisibleProviders(estateId);
+      if (alreadyVisible.some((p) => p.name.toLowerCase() === provider.name.toLowerCase())) {
+        return res.status(400).json({ message: "This provider is already in your estate" });
       }
       await storage.addProviderToEstate(providerId, estateId);
       res.json({ message: "Provider added to estate" });
