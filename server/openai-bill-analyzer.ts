@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
+import zlib from "zlib";
 import { PDFParse } from "pdf-parse";
 
 const openai = new OpenAI({
@@ -120,7 +121,6 @@ const MAX_DECOMPRESSED_BYTES = 2 * 1024 * 1024;
 const MAX_STREAM_RAW_BYTES = 500 * 1024;
 
 function extractXfaData(fileBuffer: Buffer): string | null {
-  const zlib = require("zlib");
   const str = fileBuffer.toString("binary");
 
   if (str.indexOf("XFA") === -1) return null;
