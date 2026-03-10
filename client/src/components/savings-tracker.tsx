@@ -268,7 +268,7 @@ function SpendingChart({ categoryData }: { categoryData: CategoryData }) {
 }
 
 function CategoryCard({ categoryData }: { categoryData: CategoryData }) {
-  const [expanded, setExpanded] = useState(categoryData.bills.length > 1);
+  const [expanded, setExpanded] = useState(true);
   const config = CATEGORY_CONFIG[categoryData.category] || { label: categoryData.category, color: "#6b7280", icon: Receipt };
   const Icon = config.icon;
 
