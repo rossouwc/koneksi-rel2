@@ -23,6 +23,7 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/png": ".png",
   "image/webp": ".webp",
   "image/gif": ".gif",
+  "application/pdf": ".pdf",
 };
 const ALLOWED_MIMES = Object.keys(MIME_TO_EXT);
 
@@ -34,7 +35,7 @@ const upload = multer({
       cb(null, `${randomBytes(12).toString("hex")}${ext}`);
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     cb(null, ALLOWED_MIMES.includes(file.mimetype));
   },
@@ -544,7 +545,7 @@ export async function registerRoutes(
       } catch (aiErr: any) {
         console.error("[Bill Analyzer] AI error:", aiErr.message);
         return res.status(422).json({
-          message: "Could not analyze this bill image. Please upload a clearer photo of your utility bill.",
+          message: "Could not analyze this bill. Please upload a clearer image or PDF of your utility bill.",
         });
       }
 

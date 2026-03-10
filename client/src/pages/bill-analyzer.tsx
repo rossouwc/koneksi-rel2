@@ -39,9 +39,13 @@ function UploadZone({
   const handleFile = useCallback(
     (file: File) => {
       setFileName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => setPreview(reader.result as string);
-      reader.readAsDataURL(file);
+      if (file.type === "application/pdf") {
+        setPreview("pdf");
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => setPreview(reader.result as string);
+        reader.readAsDataURL(file);
+      }
       onFileSelect(file);
     },
     [onFileSelect]
@@ -52,7 +56,7 @@ function UploadZone({
       e.preventDefault();
       setDragOver(false);
       const file = e.dataTransfer.files[0];
-      if (file && file.type.startsWith("image/")) handleFile(file);
+      if (file && (file.type.startsWith("image/") || file.type === "application/pdf")) handleFile(file);
     },
     [handleFile]
   );
@@ -109,12 +113,18 @@ function UploadZone({
       >
         {preview ? (
           <div className="relative">
-            <img
-              src={preview}
-              alt="Bill preview"
-              className="max-h-48 mx-auto rounded-xl object-contain"
-              data-testid="img-bill-preview"
-            />
+            {preview === "pdf" ? (
+              <div className="w-20 h-24 mx-auto rounded-xl bg-red-500/10 flex items-center justify-center" data-testid="icon-pdf-preview">
+                <FileText className="w-10 h-10 text-red-500" />
+              </div>
+            ) : (
+              <img
+                src={preview}
+                alt="Bill preview"
+                className="max-h-48 mx-auto rounded-xl object-contain"
+                data-testid="img-bill-preview"
+              />
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -135,14 +145,14 @@ function UploadZone({
             </div>
             <h3 className="text-lg font-semibold mb-1">Upload your bill</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Drag & drop an image of your bill, or tap to browse
+              Drag & drop your bill image or PDF, or tap to browse
             </p>
             <div className="flex items-center justify-center gap-2">
               <span className="text-xs px-3 py-1 rounded-full bg-muted text-muted-foreground">
-                JPG, PNG, WebP
+                JPG, PNG, WebP, PDF
               </span>
               <span className="text-xs px-3 py-1 rounded-full bg-muted text-muted-foreground">
-                Max 5MB
+                Max 10MB
               </span>
             </div>
           </>
@@ -150,7 +160,7 @@ function UploadZone({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleFile(file);

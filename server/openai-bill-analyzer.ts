@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import fs from "fs";
 import path from "path";
+import { PDFParse } from "pdf-parse";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -28,9 +29,9 @@ export interface BillAnalysisResult {
   };
 }
 
-const SYSTEM_PROMPT = `You are a South African utility bill analysis expert. You will receive an image of a utility bill (electricity, water, or municipal bill).
+const SYSTEM_PROMPT = `You are a South African utility bill analysis expert. You will receive either an image or extracted text from a utility bill (electricity, water, or municipal bill).
 
-Analyze the bill image and return a JSON object with this EXACT structure:
+Analyze the bill and return a JSON object with this EXACT structure:
 
 {
   "extracted": {
@@ -78,7 +79,7 @@ Rules:
 - If you cannot read parts of the bill, make reasonable estimates and note uncertainty in descriptions
 - Return ONLY valid JSON, no markdown fences or extra text`;
 
-export async function analyzeBillImage(filePath: string): Promise<BillAnalysisResult> {
+async function analyzeWithImage(filePath: string): Promise<string> {
   const absolutePath = path.resolve(filePath);
   const fileBuffer = fs.readFileSync(absolutePath);
   const base64Image = fileBuffer.toString("base64");
@@ -111,8 +112,38 @@ export async function analyzeBillImage(filePath: string): Promise<BillAnalysisRe
     temperature: 0.2,
   });
 
-  const content = response.choices[0]?.message?.content || "";
+  return response.choices[0]?.message?.content || "";
+}
 
+async function analyzeWithPdfText(filePath: string): Promise<string> {
+  const absolutePath = path.resolve(filePath);
+  const fileBuffer = fs.readFileSync(absolutePath);
+  const parser = new PDFParse({ data: fileBuffer });
+  const textResult = await parser.getText();
+  const pdfText = textResult.text;
+  await parser.destroy();
+
+  if (!pdfText || pdfText.trim().length < 20) {
+    throw new Error("Could not extract readable text from this PDF. Try uploading an image or a clearer PDF.");
+  }
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `Here is the extracted text from a South African utility bill PDF. Analyze it and return the JSON analysis.\n\n---\n${pdfText.slice(0, 8000)}\n---`,
+      },
+    ],
+    max_tokens: 2000,
+    temperature: 0.2,
+  });
+
+  return response.choices[0]?.message?.content || "";
+}
+
+function parseAnalysisResponse(content: string): BillAnalysisResult {
   let cleaned = content.trim();
   if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);
   else if (cleaned.startsWith("```")) cleaned = cleaned.slice(3);
@@ -132,4 +163,15 @@ export async function analyzeBillImage(filePath: string): Promise<BillAnalysisRe
   parsed.savings.totalPotentialSaving = parsed.savings.tips.reduce((sum, tip) => sum + (tip.potentialSaving || 0), 0);
 
   return parsed;
+}
+
+export async function analyzeBillImage(filePath: string): Promise<BillAnalysisResult> {
+  const ext = path.extname(filePath).toLowerCase();
+  const isPdf = ext === ".pdf";
+
+  const rawContent = isPdf
+    ? await analyzeWithPdfText(filePath)
+    : await analyzeWithImage(filePath);
+
+  return parseAnalysisResponse(rawContent);
 }
