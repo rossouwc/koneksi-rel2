@@ -654,19 +654,22 @@ function ProviderCard({
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
+      whileHover={{ y: -4, scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
       onClick={onClick}
-      className={`glass-card rounded-2xl p-5 cursor-pointer transition-all duration-200 relative overflow-hidden ${
-        isPremium ? "ring-1 ring-primary/20" : ""
+      className={`provider-card rounded-2xl p-5 cursor-pointer transition-all duration-300 relative overflow-hidden ${
+        isPremium ? "provider-card-premium" : ""
       }`}
       data-testid={`card-provider-${provider.id}`}
     >
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-500 rounded-t-2xl opacity-80" />
       {isPremium && (
-        <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-lg" />
+        <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-primary/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 blur-xl" />
       )}
+      <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-teal-500/5 to-transparent rounded-full translate-y-1/2 -translate-x-1/2 blur-lg" />
       <div className="relative">
         <div className="flex items-start gap-3.5 mb-3">
-          <div className="w-11 h-11 rounded-xl gradient-teal-subtle flex items-center justify-center text-lg flex-shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-50 to-emerald-100 dark:from-teal-900/40 dark:to-emerald-900/30 flex items-center justify-center text-lg flex-shrink-0 shadow-sm ring-1 ring-teal-200/50 dark:ring-teal-700/30">
             {icon}
           </div>
           <div className="flex-1 min-w-0">
