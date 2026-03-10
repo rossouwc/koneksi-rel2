@@ -558,6 +558,12 @@ export async function registerRoutes(
         fileUrl,
         analysisResult: JSON.stringify(analysis),
         status: "pending",
+        provider: analysis.extracted.provider || null,
+        billingPeriod: analysis.extracted.billingPeriod || null,
+        accountNumber: analysis.extracted.accountNumber || null,
+        usageKwh: analysis.extracted.usageKwh != null ? Math.round(analysis.extracted.usageKwh) : null,
+        usageKl: analysis.extracted.usageKl != null ? Math.round(analysis.extracted.usageKl * 10) : null,
+        tariffRate: analysis.extracted.tariffRate != null ? Math.round(analysis.extracted.tariffRate * 100) : null,
       });
 
       res.json({ bill, analysis });

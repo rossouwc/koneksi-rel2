@@ -53,7 +53,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
   - approvalStatus: "approved" (default for estate_admin creators), "pending" (default for residents joining via invite code)
   - Estate admins must approve pending residents before they can access estate data
   - `verifyEstateMembership` checks both link existence AND approvalStatus === "approved"
-- **bills** - userId, estateId, title, amount (cents), dueDate, category, status
+- **bills** - userId, estateId, title, amount (cents), dueDate, category, status, provider, billingPeriod, accountNumber, usageKwh (whole kWh), usageKl (kL × 10 for 1dp precision), tariffRate (cents)
 - **outages** - userId, estateId, type (electricity/water/internet/gas/other), title, description, status
 - **providers** - estateId, createdBy, name, category, phone, whatsapp, email, website, description
 - **reviews** - providerId, userId, rating, comment
@@ -93,7 +93,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - Google OAuth button only visible for login and resident registration (hidden for estate/supplier)
 - Google OAuth button (visual placeholder, shows "Coming Soon" toast)
 - Forgot password link (shows informational toast)
-- Savings Tracker: animated counter, Recharts area chart (6-month contiguous series), expandable bill history (capped at 20), personal/estate toggle, canvas-confetti on savings detected
+- Expense Tracker: groups analyzed bills by category (electricity/water/municipal), compares actual amounts across billing periods to show real savings, charts spending trends per category, tracks electricity (kWh) and water (kL) usage over time, personal/estate toggle
 
 ## PWA
 - `client/public/manifest.json` - PWA manifest with app shortcuts, categories, maskable icons

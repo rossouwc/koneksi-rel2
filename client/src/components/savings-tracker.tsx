@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
+import { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useEstate } from "@/lib/estate-context";
 import {
@@ -8,140 +8,342 @@ import {
   Wallet,
   ChevronDown,
   ChevronUp,
-  Sparkles,
+  Zap,
+  Droplets,
   Receipt,
   Users,
   User,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  FileUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AreaChart,
   Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 import type { Bill } from "@shared/schema";
-import confetti from "canvas-confetti";
+import { Link } from "wouter";
 
-interface SavingsData {
-  totalSaving: number;
-  monthlySavings: { month: string; saving: number; bills: number }[];
-  analyzedBills: {
+interface CategoryData {
+  category: string;
+  bills: {
     id: string;
     title: string;
     amount: number;
-    saving: number;
-    overcharges: number;
-    date: string;
-    category: string;
+    provider: string | null;
+    billingPeriod: string | null;
+    usageKwh: number | null;
+    usageKl: number | null;
+    tariffRate: number | null;
+    date: Date;
   }[];
+  totalSaving: number;
+  latestAmount: number;
+  previousAmount: number | null;
 }
 
-function parseSavingsFromBills(bills: Bill[]): SavingsData {
-  const analyzed = bills.filter((b) => b.analysisResult);
-  const monthlySavingsMap = new Map<string, { saving: number; bills: number }>();
-  const analyzedBills: SavingsData["analyzedBills"] = [];
-  let totalSaving = 0;
+interface ExpenseData {
+  categories: CategoryData[];
+  totalActualSaving: number;
+  totalBills: number;
+}
+
+const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: typeof Zap }> = {
+  electricity: { label: "Electricity", color: "#eab308", icon: Zap },
+  water: { label: "Water", color: "#3b82f6", icon: Droplets },
+  municipal: { label: "Municipal", color: "#10b981", icon: Receipt },
+};
+
+function parseExpenseData(bills: Bill[]): ExpenseData {
+  const analyzed = bills.filter((b) => b.analysisResult && b.amount);
+  const categoryMap = new Map<string, CategoryData["bills"]>();
 
   for (const bill of analyzed) {
-    try {
-      const analysis = JSON.parse(bill.analysisResult!);
-      const saving = analysis.savings?.totalPotentialSaving || 0;
-      const overchargeTotal = analysis.overcharges?.items?.reduce(
-        (s: number, i: { difference: number }) => s + i.difference,
-        0
-      ) || 0;
-      totalSaving += saving;
+    const cat = bill.category || "other";
+    if (!categoryMap.has(cat)) categoryMap.set(cat, []);
 
-      const date = bill.createdAt ? new Date(bill.createdAt) : new Date();
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      const monthLabel = date.toLocaleString("en-ZA", { month: "short", year: "2-digit" });
+    let usageKwh = bill.usageKwh;
+    let usageKl = bill.usageKl;
+    let tariffRate = bill.tariffRate;
+    let provider = bill.provider;
+    let billingPeriod = bill.billingPeriod;
 
-      const existing = monthlySavingsMap.get(monthKey);
-      if (existing) {
-        existing.saving += saving;
-        existing.bills += 1;
-      } else {
-        monthlySavingsMap.set(monthKey, { saving, bills: 1 });
-      }
-
-      analyzedBills.push({
-        id: bill.id,
-        title: bill.title,
-        amount: bill.amount || 0,
-        saving,
-        overcharges: overchargeTotal,
-        date: date.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }),
-        category: bill.category || "other",
-      });
-    } catch {
-      // skip malformed analysis
+    if (bill.analysisResult && (!usageKwh || !usageKl || !tariffRate || !provider || !billingPeriod)) {
+      try {
+        const analysis = JSON.parse(bill.analysisResult);
+        const ext = analysis.extracted;
+        if (!usageKwh && ext?.usageKwh) usageKwh = Math.round(ext.usageKwh);
+        if (!usageKl && ext?.usageKl) usageKl = Math.round(ext.usageKl * 10);
+        if (!tariffRate && ext?.tariffRate) tariffRate = Math.round(ext.tariffRate * 100);
+        if (!provider && ext?.provider) provider = ext.provider;
+        if (!billingPeriod && ext?.billingPeriod) billingPeriod = ext.billingPeriod;
+      } catch {}
     }
-  }
 
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const now = new Date();
-  const monthlySavings: SavingsData["monthlySavings"] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const data = monthlySavingsMap.get(key);
-    monthlySavings.push({
-      month: `${months[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`,
-      saving: data ? Math.round(data.saving * 100) / 100 : 0,
-      bills: data ? data.bills : 0,
+    categoryMap.get(cat)!.push({
+      id: bill.id,
+      title: bill.title,
+      amount: bill.amount!,
+      provider,
+      billingPeriod,
+      usageKwh,
+      usageKl,
+      tariffRate,
+      date: bill.createdAt ? new Date(bill.createdAt) : new Date(),
     });
   }
 
-  return { totalSaving, monthlySavings, analyzedBills: analyzedBills.reverse().slice(0, 20) };
-}
+  const categories: CategoryData[] = [];
+  let totalActualSaving = 0;
 
-function AnimatedCounter({ value, prefix = "R" }: { value: number; prefix?: string }) {
-  const motionVal = useMotionValue(0);
-  const displayed = useTransform(motionVal, (v) => `${prefix}${v.toFixed(2)}`);
-  const [text, setText] = useState(`${prefix}0.00`);
+  for (const [category, catBills] of categoryMap.entries()) {
+    catBills.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  useEffect(() => {
-    const controls = animate(motionVal, value, {
-      duration: 1.5,
-      ease: "easeOut",
+    let categorySaving = 0;
+    for (let i = 1; i < catBills.length; i++) {
+      const diff = catBills[i - 1].amount - catBills[i].amount;
+      categorySaving += diff;
+    }
+
+    const latest = catBills[catBills.length - 1];
+    const previous = catBills.length > 1 ? catBills[catBills.length - 2] : null;
+
+    categories.push({
+      category,
+      bills: catBills,
+      totalSaving: categorySaving,
+      latestAmount: latest.amount,
+      previousAmount: previous ? previous.amount : null,
     });
-    const unsub = displayed.on("change", (v) => setText(v));
-    return () => {
-      controls.stop();
-      unsub();
-    };
-  }, [value, motionVal, displayed]);
 
-  return <span data-testid="text-total-savings">{text}</span>;
+    totalActualSaving += categorySaving;
+  }
+
+  categories.sort((a, b) => b.bills.length - a.bills.length);
+
+  return {
+    categories,
+    totalActualSaving,
+    totalBills: analyzed.length,
+  };
 }
 
-function CustomTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
+function formatRands(cents: number): string {
+  return `R${(cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function SpendingChart({ categoryData }: { categoryData: CategoryData }) {
+  const config = CATEGORY_CONFIG[categoryData.category] || { label: categoryData.category, color: "#6b7280", icon: Receipt };
+
+  const chartData = categoryData.bills.map((bill) => ({
+    period: bill.billingPeriod || bill.date.toLocaleDateString("en-ZA", { month: "short", year: "2-digit" }),
+    amount: bill.amount / 100,
+    usageKwh: bill.usageKwh || undefined,
+    usageKl: bill.usageKl != null ? bill.usageKl / 10 : undefined,
+  }));
+
+  const hasKwh = chartData.some((d) => d.usageKwh);
+  const hasKl = chartData.some((d) => d.usageKl);
+
   return (
-    <div className="glass-card rounded-lg px-3 py-2 text-xs shadow-lg border border-border/30">
-      <p className="font-medium mb-1">{label}</p>
-      <p className="text-emerald-600 dark:text-emerald-400">
-        Savings: R{payload[0].value.toFixed(2)}
-      </p>
-      <p className="text-muted-foreground">
-        {payload[0].payload.bills} bill{payload[0].payload.bills !== 1 ? "s" : ""} analyzed
-      </p>
+    <div className="space-y-4">
+      <div data-testid={`chart-spending-${categoryData.category}`}>
+        <p className="text-xs text-muted-foreground font-medium mb-2">Amount Over Time</p>
+        <div className="h-[160px] -ml-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id={`grad-${categoryData.category}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={config.color} stopOpacity={0.25} />
+                  <stop offset="95%" stopColor={config.color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} />
+              <XAxis dataKey="period" tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R${v}`} width={55} />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  return (
+                    <div className="glass-card rounded-lg px-3 py-2 text-xs shadow-lg border border-border/30">
+                      <p className="font-medium mb-1">{label}</p>
+                      <p style={{ color: config.color }}>R{payload[0].value?.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  );
+                }}
+              />
+              <Area type="monotone" dataKey="amount" stroke={config.color} strokeWidth={2} fill={`url(#grad-${categoryData.category})`} animationDuration={1000} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {(hasKwh || hasKl) && (
+        <div data-testid={`chart-usage-${categoryData.category}`}>
+          <p className="text-xs text-muted-foreground font-medium mb-2">Usage Over Time</p>
+          <div className="h-[160px] -ml-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} />
+                <XAxis dataKey="period" tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }} axisLine={false} tickLine={false} width={45} />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    return (
+                      <div className="glass-card rounded-lg px-3 py-2 text-xs shadow-lg border border-border/30">
+                        <p className="font-medium mb-1">{label}</p>
+                        {payload.map((p: any) => (
+                          <p key={p.dataKey} style={{ color: p.color }}>
+                            {p.dataKey === "usageKwh" ? `${p.value} kWh` : `${p.value} kL`}
+                          </p>
+                        ))}
+                      </div>
+                    );
+                  }}
+                />
+                {hasKwh && (
+                  <Line type="monotone" dataKey="usageKwh" name="Electricity (kWh)" stroke="#eab308" strokeWidth={2} dot={{ r: 3 }} animationDuration={1000} />
+                )}
+                {hasKl && (
+                  <Line type="monotone" dataKey="usageKl" name="Water (kL)" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} animationDuration={1000} />
+                )}
+                <Legend
+                  wrapperStyle={{ fontSize: "10px" }}
+                  iconSize={8}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function CategoryCard({ categoryData }: { categoryData: CategoryData }) {
+  const [expanded, setExpanded] = useState(categoryData.bills.length > 1);
+  const config = CATEGORY_CONFIG[categoryData.category] || { label: categoryData.category, color: "#6b7280", icon: Receipt };
+  const Icon = config.icon;
+
+  const diff = categoryData.previousAmount != null ? categoryData.previousAmount - categoryData.latestAmount : null;
+  const diffPct = diff != null && categoryData.previousAmount ? (diff / categoryData.previousAmount) * 100 : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card rounded-2xl overflow-hidden"
+      data-testid={`card-category-${categoryData.category}`}
+    >
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-muted/20 transition-colors"
+        data-testid={`button-toggle-${categoryData.category}`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${config.color}15` }}>
+            <Icon className="w-4.5 h-4.5" style={{ color: config.color }} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{config.label}</p>
+            <p className="text-xs text-muted-foreground">{categoryData.bills.length} bill{categoryData.bills.length !== 1 ? "s" : ""}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-sm font-bold">{formatRands(categoryData.latestAmount)}</p>
+            {diff != null && (
+              <div className={`flex items-center gap-0.5 text-xs font-medium justify-end ${diff > 0 ? "text-emerald-600 dark:text-emerald-400" : diff < 0 ? "text-red-500" : "text-muted-foreground"}`}>
+                {diff > 0 ? <ArrowDownRight className="w-3 h-3" /> : diff < 0 ? <ArrowUpRight className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                {diff !== 0 ? `${Math.abs(diffPct!).toFixed(0)}%` : "0%"}
+              </div>
+            )}
+          </div>
+          {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </div>
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 space-y-4">
+              {categoryData.bills.length > 1 ? (
+                <>
+                  {diff != null && (
+                    <div className={`rounded-xl p-3 text-sm ${diff > 0 ? "bg-emerald-50 dark:bg-emerald-900/10 text-emerald-700 dark:text-emerald-300" : diff < 0 ? "bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300" : "bg-muted/30 text-muted-foreground"}`}>
+                      {diff > 0 ? (
+                        <span className="flex items-center gap-1.5">
+                          <TrendingDown className="w-4 h-4" />
+                          You saved <strong>{formatRands(diff)}</strong> compared to your previous bill
+                        </span>
+                      ) : diff < 0 ? (
+                        <span className="flex items-center gap-1.5">
+                          <TrendingUp className="w-4 h-4" />
+                          Your bill increased by <strong>{formatRands(Math.abs(diff))}</strong> from the previous period
+                        </span>
+                      ) : (
+                        <span>Your bill amount stayed the same</span>
+                      )}
+                    </div>
+                  )}
+                  <SpendingChart categoryData={categoryData} />
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground font-medium">Bill History</p>
+                    {[...categoryData.bills].reverse().map((bill, i) => (
+                      <div key={bill.id} className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-muted/20" data-testid={`history-bill-${bill.id}`}>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">{bill.billingPeriod || bill.title}</p>
+                          <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+                            {bill.usageKwh && <span className="flex items-center gap-0.5"><Zap className="w-2.5 h-2.5" />{bill.usageKwh} kWh</span>}
+                            {bill.usageKl != null && <span className="flex items-center gap-0.5"><Droplets className="w-2.5 h-2.5" />{(bill.usageKl / 10).toFixed(1)} kL</span>}
+                          </div>
+                        </div>
+                        <p className="text-sm font-semibold flex-shrink-0">{formatRands(bill.amount)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-6">
+                  <FileUp className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
+                  <p className="text-sm text-muted-foreground">Upload another {config.label.toLowerCase()} bill to start tracking</p>
+                  <Link href="/bill-analyzer">
+                    <Button variant="outline" size="sm" className="mt-3 rounded-xl" data-testid="button-upload-more">
+                      <FileUp className="w-3.5 h-3.5 mr-1.5" />
+                      Upload Bill
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
 export function SavingsTracker() {
   const { currentEstate } = useEstate();
-  const [viewMode, setViewMode] = useState<"personal" | "estate">(
-    currentEstate ? "estate" : "personal"
-  );
-  const [historyExpanded, setHistoryExpanded] = useState(false);
-  const confettiFired = useRef(false);
+  const [viewMode, setViewMode] = useState<"personal" | "estate">(currentEstate ? "estate" : "personal");
 
   const personalUrl = "/api/bills";
   const estateUrl = currentEstate ? `/api/bills?estateId=${currentEstate.id}` : null;
@@ -158,58 +360,36 @@ export function SavingsTracker() {
   const isLoading = viewMode === "personal" ? personalLoading : estateLoading;
   const activeBills = viewMode === "estate" && currentEstate ? estateBills : personalBills;
 
-  const savings = useMemo(() => parseSavingsFromBills(activeBills), [activeBills]);
-
-  useEffect(() => {
-    if (savings.totalSaving > 0 && !confettiFired.current) {
-      confettiFired.current = true;
-      setTimeout(() => {
-        confetti({
-          particleCount: 60,
-          spread: 70,
-          origin: { y: 0.6, x: 0.5 },
-          colors: ["#0f766e", "#10b981", "#34d399", "#6ee7b7"],
-          disableForReducedMotion: true,
-        });
-      }, 800);
-    }
-  }, [savings.totalSaving]);
-
-  useEffect(() => {
-    confettiFired.current = false;
-  }, [viewMode]);
+  const expenseData = useMemo(() => parseExpenseData(activeBills), [activeBills]);
 
   if (isLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-48 rounded-lg" />
-        <Skeleton className="h-[180px] rounded-2xl" />
+        <Skeleton className="h-[140px] rounded-2xl" />
         <Skeleton className="h-[200px] rounded-2xl" />
-        <Skeleton className="h-[120px] rounded-2xl" />
       </div>
     );
   }
 
-  const trend = savings.monthlySavings;
-  const currentMonth = trend.length > 0 ? trend[trend.length - 1].saving : 0;
-  const prevMonth = trend.length > 1 ? trend[trend.length - 2].saving : 0;
-  const trendPct = prevMonth > 0 ? ((currentMonth - prevMonth) / prevMonth) * 100 : currentMonth > 0 ? 100 : 0;
+  const hasSavings = expenseData.totalActualSaving !== 0;
+  const isSaving = expenseData.totalActualSaving > 0;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-bold flex items-center gap-2" data-testid="text-savings-heading">
+        <h2 className="text-lg font-bold flex items-center gap-2" data-testid="text-expense-heading">
           <Wallet className="w-5 h-5 text-primary" />
-          Savings Tracker
+          Expense Tracker
         </h2>
         {currentEstate && (
-          <div className="flex rounded-xl overflow-hidden border border-border/60" data-testid="toggle-savings-mode">
+          <div className="flex rounded-xl overflow-hidden border border-border/60" data-testid="toggle-expense-mode">
             <Button
               variant={viewMode === "personal" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("personal")}
               className="rounded-none rounded-l-xl text-xs h-8 gap-1.5"
-              data-testid="button-savings-personal"
+              data-testid="button-expense-personal"
             >
               <User className="w-3 h-3" />
               Personal
@@ -219,7 +399,7 @@ export function SavingsTracker() {
               size="sm"
               onClick={() => setViewMode("estate")}
               className="rounded-none rounded-r-xl text-xs h-8 gap-1.5"
-              data-testid="button-savings-estate"
+              data-testid="button-expense-estate"
             >
               <Users className="w-3 h-3" />
               Estate
@@ -228,175 +408,73 @@ export function SavingsTracker() {
         )}
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="rounded-2xl p-5 relative overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(15,118,110,0.08) 100%)",
-        }}
-      >
-        <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-400/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-        <div className="absolute bottom-0 left-0 w-28 h-28 bg-teal-400/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
-        <div className="relative">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wider">
-              {viewMode === "estate" && currentEstate ? `${currentEstate.name} Savings` : "Your Total Savings"}
-            </span>
-          </div>
-          <div className="flex items-end gap-3">
-            <p className="text-3xl md:text-4xl font-bold text-emerald-700 dark:text-emerald-300">
-              <AnimatedCounter value={savings.totalSaving} />
-            </p>
-            {trendPct !== 0 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.6 }}
-                className={`flex items-center gap-0.5 text-xs font-medium px-2 py-0.5 rounded-full mb-1 ${
-                  trendPct > 0
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                }`}
-                data-testid="text-savings-trend"
-              >
-                {trendPct > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                {Math.abs(trendPct).toFixed(0)}%
-              </motion.div>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            From {savings.analyzedBills.length} analyzed bill{savings.analyzedBills.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.4 }}
-        className="glass-card rounded-2xl p-4"
-      >
-        <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Monthly Savings Trend</h3>
-        <div className="h-[180px] -ml-2" data-testid="chart-savings-trend">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={savings.monthlySavings} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-              <defs>
-                <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `R${v}`}
-                width={50}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Area
-                type="monotone"
-                dataKey="saving"
-                stroke="#10b981"
-                strokeWidth={2}
-                fill="url(#savingsGradient)"
-                animationDuration={1200}
-                animationEasing="ease-out"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.4 }}
-        className="glass-card rounded-2xl overflow-hidden"
-      >
-        <button
-          onClick={() => setHistoryExpanded(!historyExpanded)}
-          className="w-full flex items-center justify-between gap-2 p-4 text-left hover:bg-muted/20 transition-colors"
-          data-testid="button-toggle-history"
+      {expenseData.totalBills === 0 ? (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card rounded-2xl p-8 text-center"
         >
-          <div className="flex items-center gap-2">
-            <Receipt className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold">Bill Analysis History</span>
-            <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-              {savings.analyzedBills.length}
-            </span>
-          </div>
-          {historyExpanded ? (
-            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          )}
-        </button>
-
-        <AnimatePresence>
-          {historyExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="overflow-hidden"
-            >
-              <div className="px-4 pb-4 space-y-2">
-                {savings.analyzedBills.length === 0 ? (
-                  <div className="text-center py-6">
-                    <Receipt className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-                    <p className="text-sm text-muted-foreground">No analyzed bills yet</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1">Upload a bill to the Bill Analyzer to see savings</p>
-                  </div>
-                ) : (
-                  savings.analyzedBills.map((bill, i) => (
-                    <motion.div
-                      key={bill.id}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: Math.min(i * 0.05, 0.5) }}
-                      className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors"
-                      data-testid={`history-bill-${bill.id}`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{bill.title}</p>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <span className="text-[10px] text-muted-foreground capitalize">{bill.category}</span>
-                          <span className="text-[10px] text-muted-foreground">{bill.date}</span>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs text-muted-foreground">
-                          R{(bill.amount / 100).toFixed(2)}
-                        </p>
-                        <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                          -R{bill.saving.toFixed(2)}
-                        </p>
-                        {bill.overcharges > 0 && (
-                          <p className="text-[10px] text-red-500">
-                            R{bill.overcharges.toFixed(2)} overcharged
-                          </p>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))
-                )}
+          <Receipt className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+          <p className="text-sm font-medium text-muted-foreground">No analyzed bills yet</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">Upload bills via the Bill Analyzer to start tracking your expenses</p>
+          <Link href="/bill-analyzer">
+            <Button variant="outline" size="sm" className="mt-4 rounded-xl" data-testid="button-start-tracking">
+              <FileUp className="w-3.5 h-3.5 mr-1.5" />
+              Upload Your First Bill
+            </Button>
+          </Link>
+        </motion.div>
+      ) : (
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="rounded-2xl p-5 relative overflow-hidden"
+            style={{
+              background: hasSavings && isSaving
+                ? "linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(15,118,110,0.08) 100%)"
+                : hasSavings
+                  ? "linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(220,38,38,0.05) 100%)"
+                  : "linear-gradient(135deg, rgba(107,114,128,0.08) 0%, rgba(75,85,99,0.05) 100%)",
+            }}
+          >
+            <div className="absolute top-0 right-0 w-36 h-36 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"
+              style={{ backgroundColor: isSaving ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.05)" }} />
+            <div className="relative">
+              <div className="flex items-center gap-1.5 mb-1">
+                {isSaving ? <TrendingDown className="w-3.5 h-3.5 text-emerald-500" /> : hasSavings ? <TrendingUp className="w-3.5 h-3.5 text-red-500" /> : <Minus className="w-3.5 h-3.5 text-muted-foreground" />}
+                <span className={`text-xs font-medium uppercase tracking-wider ${isSaving ? "text-emerald-600 dark:text-emerald-400" : hasSavings ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                  {viewMode === "estate" && currentEstate ? `${currentEstate.name}` : "Your Expenses"}
+                </span>
               </div>
+              <div className="flex items-end gap-3">
+                <p className={`text-3xl md:text-4xl font-bold ${isSaving ? "text-emerald-700 dark:text-emerald-300" : hasSavings ? "text-red-600 dark:text-red-400" : "text-foreground"}`} data-testid="text-total-savings">
+                  {hasSavings ? (isSaving ? "Saved " : "Increased ") : ""}
+                  {hasSavings ? formatRands(Math.abs(expenseData.totalActualSaving)) : "Tracking"}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {hasSavings
+                  ? `Across ${expenseData.categories.length} expense categor${expenseData.categories.length !== 1 ? "ies" : "y"} from ${expenseData.totalBills} bills`
+                  : `${expenseData.totalBills} bill${expenseData.totalBills !== 1 ? "s" : ""} analyzed — upload more to track changes`
+                }
+              </p>
+            </div>
+          </motion.div>
+
+          {expenseData.categories.map((cat, i) => (
+            <motion.div
+              key={cat.category}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + i * 0.08, duration: 0.4 }}
+            >
+              <CategoryCard categoryData={cat} />
             </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

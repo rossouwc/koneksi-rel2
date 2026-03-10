@@ -58,6 +58,12 @@ export const bills = pgTable("bills", {
   status: text("status").default("pending"),
   fileUrl: text("file_url"),
   analysisResult: text("analysis_result"),
+  provider: text("provider"),
+  billingPeriod: text("billing_period"),
+  accountNumber: text("account_number"),
+  usageKwh: integer("usage_kwh"),
+  usageKl: integer("usage_kl"),
+  tariffRate: integer("tariff_rate"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
