@@ -11,6 +11,7 @@ import path from "path";
 import fs from "fs";
 import { analyzeBillImage } from "./openai-bill-analyzer";
 import { buildPayFastUrl, validatePayFastITN } from "./payfast";
+import { searchAreas, getAreaInfo, getStatus as getEspStatus } from "./eskomsepush";
 import { db } from "./db";
 import { users, estates, userEstates, bills, outages, providers, reviews, providerVisibleEstates } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
@@ -1562,6 +1563,81 @@ export async function registerRoutes(
       }
       await db.update(estates).set({ approvalStatus: "rejected" }).where(eq(estates.id, estate.id));
       res.json({ message: "Estate rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── EskomSePush Integration ──
+  app.get("/api/esp/search", requireAuth, async (req, res) => {
+    try {
+      const text = req.query.text as string;
+      if (!text || text.length < 2) {
+        return res.status(400).json({ message: "Search text must be at least 2 characters" });
+      }
+      const results = await searchAreas(text);
+      res.json(results);
+    } catch (err: any) {
+      console.error("[ESP] Search error:", err.message);
+      if (err.message === "ESP_RATE_LIMIT") return res.status(429).json({ message: "API quota exceeded, please try again later" });
+      if (err.message === "ESP_AUTH_FAILED") return res.status(502).json({ message: "Load shedding service authentication failed" });
+      res.status(500).json({ message: "Failed to search areas" });
+    }
+  });
+
+  app.get("/api/esp/area", requireAuth, async (req, res) => {
+    try {
+      const id = req.query.id as string;
+      if (!id) {
+        return res.status(400).json({ message: "Area ID is required" });
+      }
+      const info = await getAreaInfo(id);
+      res.json(info);
+    } catch (err: any) {
+      console.error("[ESP] Area info error:", err.message);
+      if (err.message === "ESP_RATE_LIMIT") return res.status(429).json({ message: "API quota exceeded, please try again later" });
+      if (err.message === "ESP_AUTH_FAILED") return res.status(502).json({ message: "Load shedding service authentication failed" });
+      res.status(500).json({ message: "Failed to get area info" });
+    }
+  });
+
+  app.get("/api/esp/status", requireAuth, async (req, res) => {
+    try {
+      const status = await getEspStatus();
+      res.json(status);
+    } catch (err: any) {
+      console.error("[ESP] Status error:", err.message);
+      if (err.message === "ESP_RATE_LIMIT") return res.status(429).json({ message: "API quota exceeded" });
+      if (err.message === "ESP_AUTH_FAILED") return res.status(502).json({ message: "Load shedding service authentication failed" });
+      res.status(500).json({ message: "Failed to get load shedding status" });
+    }
+  });
+
+  app.patch("/api/estates/:id/esp-area", requireAuth, async (req, res) => {
+    try {
+      const estateId = req.params.id;
+      const { espAreaId, espAreaName } = req.body;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can set the load shedding area" });
+      }
+      const updated = await storage.updateEstate(estateId, { espAreaId: espAreaId || null, espAreaName: espAreaName || null });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/properties/:id/esp-area", requireAuth, async (req, res) => {
+    try {
+      const propertyId = req.params.id;
+      const { espAreaId, espAreaName } = req.body;
+      const property = await storage.getUserProperty(propertyId);
+      if (!property || property.userId !== req.session.userId) {
+        return res.status(403).json({ message: "You can only set load shedding area for your own properties" });
+      }
+      const updated = await storage.updateUserProperty(propertyId, { espAreaId: espAreaId || null, espAreaName: espAreaName || null });
+      res.json(updated);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

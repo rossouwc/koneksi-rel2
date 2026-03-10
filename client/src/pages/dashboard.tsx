@@ -22,6 +22,7 @@ import {
   UserX,
   Check,
   X,
+  Activity,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +65,113 @@ function StatCard({
         </p>
       </div>
     </motion.div>
+  );
+}
+
+interface EspStatus {
+  status: {
+    eskom: { stage: string; stage_updated: string };
+    capetown?: { stage: string; stage_updated: string };
+  };
+}
+
+interface EspEvent { note: string; start: string; end: string; }
+interface EspAreaInfo {
+  events: EspEvent[];
+  info: { name: string; region: string };
+  schedule: { days: any[] };
+}
+
+function DashboardEspWidget() {
+  const { currentEstate, currentProperty } = useEstate();
+  const espAreaId = currentEstate?.espAreaId || currentProperty?.espAreaId || null;
+  const espAreaName = currentEstate?.espAreaName || currentProperty?.espAreaName || null;
+
+  const { data: status } = useQuery<EspStatus>({
+    queryKey: ["/api/esp/status"],
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const { data: areaInfo } = useQuery<EspAreaInfo>({
+    queryKey: ["/api/esp/area", espAreaId],
+    queryFn: async () => {
+      const res = await fetch(`/api/esp/area?id=${encodeURIComponent(espAreaId!)}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!espAreaId,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const eskomStage = (() => {
+    const m = status?.status?.eskom?.stage?.match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : 0;
+  })();
+
+  const stageColor = eskomStage === 0
+    ? "text-emerald-600 dark:text-emerald-400"
+    : eskomStage <= 2
+    ? "text-yellow-600 dark:text-yellow-400"
+    : eskomStage <= 4
+    ? "text-orange-600 dark:text-orange-400"
+    : "text-red-600 dark:text-red-400";
+
+  const stageBg = eskomStage === 0
+    ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+    : eskomStage <= 2
+    ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
+    : eskomStage <= 4
+    ? "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800"
+    : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800";
+
+  const now = new Date();
+  const nextEvent = (areaInfo?.events || [])
+    .filter(e => new Date(e.end) > now)
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())[0];
+
+  const currentlyActive = nextEvent && new Date(nextEvent.start) <= now;
+
+  if (!espAreaId) {
+    return (
+      <Link href="/outages">
+        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer" data-testid="link-setup-esp">
+          <Zap className="w-4 h-4 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Link your area for load shedding alerts →</span>
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <div className={`rounded-lg border p-2.5 ${stageBg}`} data-testid="dashboard-esp-widget">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Activity className={`w-4 h-4 flex-shrink-0 ${stageColor}`} />
+          <div className="min-w-0">
+            <span className={`text-sm font-bold ${stageColor}`}>
+              {eskomStage === 0 ? "No Load Shedding" : `Stage ${eskomStage}`}
+            </span>
+            {espAreaName && (
+              <p className="text-[10px] text-muted-foreground truncate">{espAreaName}</p>
+            )}
+          </div>
+        </div>
+        {nextEvent && (
+          <div className="text-right flex-shrink-0">
+            {currentlyActive ? (
+              <div className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">ACTIVE NOW</span>
+              </div>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">
+                Next: {new Date(nextEvent.start).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false })}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -439,7 +547,7 @@ export default function Dashboard() {
         >
           <Card className="rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-              <CardTitle className="text-base font-semibold">Active Outages</CardTitle>
+              <CardTitle className="text-base font-semibold">Outages & Load Shedding</CardTitle>
               <Link href="/outages">
                 <Button variant="ghost" size="sm" data-testid="link-view-all-outages" className="text-xs">
                   View all
@@ -447,15 +555,15 @@ export default function Dashboard() {
               </Link>
             </CardHeader>
             <CardContent className="space-y-3">
+              <DashboardEspWidget />
               {outagesLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-14 rounded-lg" />
                 ))
               ) : recentOutages.length === 0 ? (
-                <div className="text-center py-8">
-                  <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500/40 mb-2" />
-                  <p className="text-sm text-muted-foreground">No active outages</p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">Everything is running smoothly</p>
+                <div className="text-center py-4">
+                  <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500/40 mb-1" />
+                  <p className="text-xs text-muted-foreground">No community-reported outages</p>
                 </div>
               ) : (
                 recentOutages.map((outage) => (

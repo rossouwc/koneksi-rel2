@@ -35,6 +35,8 @@ export const estates = pgTable("estates", {
   province: text("province"),
   inviteCode: text("invite_code").notNull().unique(),
   approvalStatus: text("approval_status").default("pending"),
+  espAreaId: text("esp_area_id"),
+  espAreaName: text("esp_area_name"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -122,6 +124,8 @@ export const userProperties = pgTable("user_properties", {
   city: text("city"),
   province: text("province"),
   postalCode: text("postal_code"),
+  espAreaId: text("esp_area_id"),
+  espAreaName: text("esp_area_name"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

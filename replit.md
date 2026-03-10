@@ -8,6 +8,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - **Backend**: Express.js, PostgreSQL, Drizzle ORM
 - **AI**: OpenAI GPT-4o Vision via Replit AI Integrations (bill analysis)
 - **Payments**: PayFast recurring subscriptions (MD5 signature verification, ITN webhook)
+- **Load Shedding**: EskomSePush API (real-time area alerts, schedules, national status)
 - **Auth**: Session-based (express-session + scrypt hashing)
 - **State**: TanStack React Query
 
@@ -18,6 +19,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `server/routes.ts` - Express API routes with session auth + estate membership verification
 - `server/openai-bill-analyzer.ts` - GPT-4o Vision bill analysis (base64 image → structured JSON)
 - `server/payfast.ts` - PayFast URL builder + ITN signature verification + webhook validation
+- `server/eskomsepush.ts` - EskomSePush API proxy with in-memory caching (5min status, 30min area info)
 - `server/seed.ts` - Seed data for demo (admin@koneksi.app / admin123, demo@koneksi.app / demo123, supplier@koneksi.app / supplier123)
 - `client/src/pages/pending-approval.tsx` - Pending supplier approval page (shown when supplier.approvalStatus='pending')
 - `client/src/lib/auth.tsx` - Auth context provider (useAuth hook, supports resident/estate/supplier registration)
@@ -49,12 +51,12 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - **users** - id, email, password, fullName, phone, suburb, avatarUrl, role (user_role enum), profileComplete, isSuperAdmin, businessName, businessWebsite, services (text[]), approvalStatus
   - role enum: resident, estate_admin, super_admin, supplier
   - approvalStatus: null (default for residents), "pending" (supplier awaiting review), "approved", "rejected"
-- **estates** - id, name, streetName, suburb, city, province, inviteCode (auto-generated 8-char uppercase), approvalStatus (pending/approved/rejected, default pending)
+- **estates** - id, name, streetName, suburb, city, province, inviteCode (auto-generated 8-char uppercase), approvalStatus (pending/approved/rejected, default pending), espAreaId, espAreaName (EskomSePush area linking)
 - **user_estates** - junction table (userId, estateId, roleInEstate, approvalStatus)
   - approvalStatus: "approved" (default for estate_admin creators), "pending" (default for residents joining via invite code)
   - Estate admins must approve pending residents before they can access estate data
   - `verifyEstateMembership` checks both link existence AND approvalStatus === "approved"
-- **userProperties** - id (UUID), userId, name, streetAddress, suburb, city, province, postalCode, createdAt (standalone residential addresses not in any estate)
+- **userProperties** - id (UUID), userId, name, streetAddress, suburb, city, province, postalCode, espAreaId, espAreaName, createdAt (standalone residential addresses not in any estate)
 - **bills** - userId, estateId, propertyId (nullable), title, amount (cents), dueDate, category, status, provider, billingPeriod, accountNumber, usageKwh (whole kWh), usageKl (kL × 10 for 1dp precision), tariffRate (cents)
 - **outages** - userId, estateId, propertyId (nullable), type (electricity/water/internet/gas/other), title, description, status
 - **providers** - estateId, createdBy, name, category, phone, whatsapp, email, website, description, providerApprovalStatus (approved/pending/rejected, default approved), recommendedBy (userId of recommender)
@@ -69,7 +71,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - Profile setup page - shown after first login if profile incomplete (phone, suburb fields)
 - `/` - Dashboard when authenticated
 - `/bills` - Bill management with add dialog
-- `/outages` - Outage reporting and tracking
+- `/outages` - Outage reporting and tracking + EskomSePush live load shedding (national status, area events, area linking)
 - `/providers` - Service providers directory: searchable + filterable (category, rating, services), provider detail view with reviews + reviewer names, review submission with star ratings, phone/WhatsApp/email/website contact buttons
   - Residents: browse approved providers, "Recommend a Provider" (pending admin approval), "Invite a Provider" (unregistered providers)
   - Estate Admins: admin panel with tabs (Pending / Browse / Invitations), approve/reject recommendations, add registered providers from platform, view resident invitations
@@ -149,6 +151,11 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - GET /api/admin/estates-with-stats - All estates with resident/bill/outage/provider counts
 - GET /api/admin/estates/:id - Single estate detail with stats
 - PATCH /api/admin/estates/:id - Update estate (name, streetName, suburb, city, province)
+- GET /api/esp/search?text= - Search EskomSePush areas by name (authenticated)
+- GET /api/esp/area?id= - Get area schedule + upcoming events (authenticated, cached 30min)
+- GET /api/esp/status - Get national load shedding status (authenticated, cached 5min)
+- PATCH /api/estates/:id/esp-area - Set ESP area for estate (estate admin only)
+- PATCH /api/properties/:id/esp-area - Set ESP area for property (owner only)
 - GET /api/admin/pending-estates - All estates with approvalStatus=pending (admin only)
 - PATCH /api/admin/estates/:id/approve - Approve pending estate (admin only)
 - PATCH /api/admin/estates/:id/reject - Reject pending estate (admin only)

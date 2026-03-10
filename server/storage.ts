@@ -45,7 +45,7 @@ export interface IStorage {
   getProvidersScoped(userId: string, estateIds: string[], estateId?: string): Promise<Provider[]>;
   createProvider(provider: InsertProvider): Promise<Provider>;
 
-  updateEstate(id: string, data: { name?: string; suburb?: string | null; city?: string | null; province?: string | null }): Promise<Estate>;
+  updateEstate(id: string, data: { name?: string; suburb?: string | null; city?: string | null; province?: string | null; espAreaId?: string | null; espAreaName?: string | null }): Promise<Estate>;
   getEstateResidents(estateId: string): Promise<{ user: User; role: string; joinedAt: Date | null }[]>;
   getEstateStats(estateId: string): Promise<{ residentCount: number; billCount: number; outageCount: number; providerCount: number }>;
 
@@ -69,6 +69,7 @@ export interface IStorage {
   createUserProperty(data: InsertUserProperty): Promise<UserProperty>;
   deleteUserProperty(id: string, userId: string): Promise<void>;
   getUserProperty(id: string): Promise<UserProperty | undefined>;
+  updateUserProperty(id: string, data: { espAreaId?: string | null; espAreaName?: string | null }): Promise<UserProperty>;
 
   getPendingProviders(estateId: string): Promise<Provider[]>;
   approveProvider(id: string): Promise<Provider>;
@@ -218,7 +219,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateEstate(id: string, data: { name?: string; suburb?: string | null; city?: string | null; province?: string | null }): Promise<Estate> {
+  async updateEstate(id: string, data: { name?: string; suburb?: string | null; city?: string | null; province?: string | null; espAreaId?: string | null; espAreaName?: string | null }): Promise<Estate> {
     const [updated] = await db.update(estates).set(data).where(eq(estates.id, id)).returning();
     return updated;
   }
@@ -391,6 +392,11 @@ export class DatabaseStorage implements IStorage {
   async getUserProperty(id: string): Promise<UserProperty | undefined> {
     const [prop] = await db.select().from(userProperties).where(eq(userProperties.id, id));
     return prop;
+  }
+
+  async updateUserProperty(id: string, data: { espAreaId?: string | null; espAreaName?: string | null }): Promise<UserProperty> {
+    const [updated] = await db.update(userProperties).set(data).where(eq(userProperties.id, id)).returning();
+    return updated;
   }
 
   async getPendingProviders(estateId: string): Promise<Provider[]> {
