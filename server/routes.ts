@@ -935,10 +935,14 @@ export async function registerRoutes(
         return res.json(reviews);
       }
       const memberEstateIds = await getUserEstateIds(userId);
-      const providers = await storage.getProvidersScoped(userId, memberEstateIds);
-      const providerIds = providers.map((p) => p.id);
+      const providerSets = await Promise.all(
+        memberEstateIds.map((eid) => storage.getVisibleProviders(eid))
+      );
+      const directProviders = await storage.getProvidersScoped(userId, memberEstateIds);
+      const allVisible = [...directProviders, ...providerSets.flat()];
+      const providerIdSet = new Set(allVisible.map((p) => p.id));
       const allReviews = await storage.getReviews();
-      const scopedReviews = allReviews.filter((r) => providerIds.includes(r.providerId));
+      const scopedReviews = allReviews.filter((r) => providerIdSet.has(r.providerId));
       res.json(scopedReviews);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
