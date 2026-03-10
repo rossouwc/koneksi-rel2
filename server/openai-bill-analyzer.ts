@@ -193,7 +193,12 @@ async function analyzeWithPdfText(filePath: string): Promise<string> {
     }
   }
 
-  if (!pdfText || pdfText.trim().length < 50) {
+  const isPlaceholder = pdfText.toLowerCase().includes("adobe reader") ||
+    pdfText.toLowerCase().includes("requires adobe") ||
+    pdfText.toLowerCase().includes("viewing environment");
+  const hasUsefulText = pdfText.trim().length >= 50 && !isPlaceholder;
+
+  if (!hasUsefulText) {
     const xfaData = extractXfaData(fileBuffer);
     if (xfaData) {
       console.log("[Bill Analyzer] Using XFA XML data extraction (" + xfaData.length + " chars)");
@@ -238,13 +243,29 @@ function parseAnalysisResponse(content: string): BillAnalysisResult {
   if (cleaned.endsWith("```")) cleaned = cleaned.slice(0, -3);
   cleaned = cleaned.trim();
 
-  const parsed = JSON.parse(cleaned) as BillAnalysisResult;
+  const parsed = JSON.parse(cleaned) as any;
+
+  if ((parsed as any).overcharges && !parsed.flaggedItems) {
+    const oc = (parsed as any).overcharges;
+    parsed.flaggedItems = {
+      found: oc.found ?? false,
+      items: (oc.items || []).map((item: any) => ({
+        description: item.description || "",
+        typicalRange: item.typicalRange || (item.expectedAmount != null ? `R${item.expectedAmount}` : "N/A"),
+        chargedAmount: item.chargedAmount || 0,
+        difference: item.difference || 0,
+      })),
+    };
+    delete (parsed as any).overcharges;
+  }
 
   if (!parsed.extracted || !parsed.flaggedItems || !parsed.savings) {
+    console.log("[Bill Analyzer] Incomplete AI response keys:", Object.keys(parsed));
     throw new Error("Incomplete analysis result from AI");
   }
 
   if (typeof parsed.extracted.totalAmount !== "number" || parsed.extracted.totalAmount <= 0) {
+    console.log("[Bill Analyzer] Invalid totalAmount:", parsed.extracted.totalAmount, "| extracted:", JSON.stringify(parsed.extracted).slice(0, 300));
     throw new Error("Could not extract a valid total amount from the bill");
   }
 
@@ -261,5 +282,10 @@ export async function analyzeBillImage(filePath: string): Promise<BillAnalysisRe
     ? await analyzeWithPdfText(filePath)
     : await analyzeWithImage(filePath);
 
-  return parseAnalysisResponse(rawContent);
+  try {
+    return parseAnalysisResponse(rawContent);
+  } catch (e) {
+    console.log("[Bill Analyzer] AI raw response (first 500 chars):", rawContent.slice(0, 500));
+    throw e;
+  }
 }
