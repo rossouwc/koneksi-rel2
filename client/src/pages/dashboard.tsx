@@ -350,7 +350,7 @@ export default function Dashboard() {
               <>
                 <StatCard
                   title="Providers"
-                  value={hasActiveContext ? providers.length : approvedEstates.length > 0 ? "—" : 0}
+                  value={hasActiveContext ? providers.length : "Select estate"}
                   icon={Store}
                   color="bg-teal-600"
                   delay={0.15}

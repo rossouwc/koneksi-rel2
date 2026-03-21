@@ -439,39 +439,69 @@ function ProviderDashboardCard({ provider }: { provider: SupplierProvider }) {
           </div>
         </div>
 
-        {visibleEstates.length > 0 && (
-          <div className="rounded-xl border border-border/50 p-3 space-y-2" data-testid="section-visible-estates">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5" />
-              Visible in {visibleEstates.length} estate{visibleEstates.length !== 1 ? "s" : ""}
-            </p>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto">
-              {visibleEstates.map((estate) => (
-                <div
-                  key={estate.id}
-                  className="flex items-center gap-2 text-sm"
-                  data-testid={`visible-estate-${estate.id}`}
-                >
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                  <span className="font-medium truncate">{estate.name}</span>
-                  {(estate.city || estate.suburb) && (
-                    <span className="text-[10px] text-muted-foreground truncate">
-                      · {[estate.suburb, estate.city].filter(Boolean).join(", ")}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {(() => {
+          const scopeType = provider.tier?.scopeType ?? "estate";
+          const isBroadScope = scopeType === "city" || scopeType === "province" || scopeType === "national";
 
-        {provider.visibleEstateIds.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border/50 p-3 text-center" data-testid="section-no-visible-estates">
-            <Building2 className="w-5 h-5 mx-auto text-muted-foreground/40 mb-1" />
-            <p className="text-xs text-muted-foreground">Not yet visible in any estate</p>
-            <p className="text-[10px] text-muted-foreground/60 mt-0.5">Upgrade your plan to select estates</p>
-          </div>
-        )}
+          if (isBroadScope) {
+            const scopeLabel =
+              scopeType === "city" && provider.subscription?.selectedCity
+                ? provider.subscription.selectedCity
+                : scopeType === "province" && provider.subscription?.selectedProvince
+                ? provider.subscription.selectedProvince
+                : scopeType === "national"
+                ? "all of South Africa"
+                : "your selected area";
+
+            return (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-900/10 p-3" data-testid="section-broad-scope-visibility">
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 mb-1">
+                  <Building2 className="w-3.5 h-3.5" />
+                  Broad Visibility — {tierName} Plan
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Visible to estates across <span className="font-medium">{scopeLabel}</span>. No estate-level selection required.
+                </p>
+              </div>
+            );
+          }
+
+          if (visibleEstates.length > 0) {
+            return (
+              <div className="rounded-xl border border-border/50 p-3 space-y-2" data-testid="section-visible-estates">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5" />
+                  Visible in {visibleEstates.length} estate{visibleEstates.length !== 1 ? "s" : ""}
+                </p>
+                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {visibleEstates.map((estate) => (
+                    <div
+                      key={estate.id}
+                      className="flex items-center gap-2 text-sm"
+                      data-testid={`visible-estate-${estate.id}`}
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                      <span className="font-medium truncate">{estate.name}</span>
+                      {(estate.city || estate.suburb) && (
+                        <span className="text-[10px] text-muted-foreground truncate">
+                          · {[estate.suburb, estate.city].filter(Boolean).join(", ")}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="rounded-xl border border-dashed border-border/50 p-3 text-center" data-testid="section-no-visible-estates">
+              <Building2 className="w-5 h-5 mx-auto text-muted-foreground/40 mb-1" />
+              <p className="text-xs text-muted-foreground">Not yet visible in any estate</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">Upgrade your plan or select estates to gain visibility</p>
+            </div>
+          );
+        })()}
 
         {provider.subscription?.status === "active" && (
           <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
