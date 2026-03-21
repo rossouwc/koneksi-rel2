@@ -28,6 +28,7 @@ import SupplierAnalyticsPage from "@/pages/supplier-analytics";
 import SupplierBillingPage from "@/pages/supplier-billing";
 import MarketplacePage from "@/pages/marketplace";
 import JoinEstatePage from "@/pages/join-estate";
+import MaintPage from "@/pages/maint";
 import PendingApprovalPage from "@/pages/pending-approval";
 import PendingEstateApprovalPage from "@/pages/pending-estate-approval";
 import NotFound from "@/pages/not-found";
@@ -90,6 +91,7 @@ function EstateRoutes() {
         <Route path="/marketplace" component={MarketplacePage} />
         <Route path="/admin" component={AdminPage} />
         <Route path="/join-estate" component={JoinEstatePage} />
+        <Route path="/maint" component={MaintPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

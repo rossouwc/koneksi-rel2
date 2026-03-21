@@ -6,7 +6,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 ## Tech Stack
 - **Frontend**: React 18, Vite, Tailwind CSS, shadcn/ui, Framer Motion, wouter
 - **Backend**: Express.js, PostgreSQL, Drizzle ORM
-- **AI**: OpenAI GPT-4o Vision via Replit AI Integrations (bill analysis)
+- **AI**: OpenAI GPT-4o Vision via Replit AI Integrations (bill analysis + mAInt maintenance diagnosis)
 - **Payments**: PayFast recurring subscriptions (MD5 signature verification, ITN webhook)
 - **Load Shedding**: EskomSePush API (real-time area alerts, schedules, national status)
 - **Auth**: Session-based (express-session + scrypt hashing)
@@ -18,6 +18,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `server/storage.ts` - Database storage layer (IStorage interface with RLS-style scoped queries)
 - `server/routes.ts` - Express API routes with session auth + estate membership verification
 - `server/openai-bill-analyzer.ts` - GPT-4o Vision bill analysis (base64 image → structured JSON)
+- `server/openai-maint-analyzer.ts` - GPT-4o Vision home maintenance diagnosis (image → {title, description, severity, issues:[{category, tasks}]})
 - `server/payfast.ts` - PayFast URL builder + ITN signature verification + webhook validation
 - `server/eskomsepush.ts` - EskomSePush API proxy with in-memory caching (5min status, 30min area info)
 - `server/seed.ts` - Seed data for demo (admin@koneksi.app / admin123, demo@koneksi.app / demo123, supplier@koneksi.app / supplier123)

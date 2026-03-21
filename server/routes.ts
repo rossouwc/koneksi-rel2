@@ -10,6 +10,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { analyzeBillImage } from "./openai-bill-analyzer";
+import { analyzeMaintenancePhoto } from "./openai-maint-analyzer";
 import { buildPayFastUrl, validatePayFastITN } from "./payfast";
 import { searchAreas, getAreaInfo, getStatus as getEspStatus } from "./eskomsepush";
 import { db } from "./db";
@@ -627,6 +628,38 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("[Bill Analyzer] Error:", err.message);
       res.status(500).json({ message: "Something went wrong analyzing your bill. Please try again." });
+    }
+  });
+
+  app.post("/api/maint/analyze", requireAuth, upload.single("photo"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No image uploaded" });
+      }
+
+      const imageMimes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+      if (!imageMimes.includes(req.file.mimetype)) {
+        fs.unlinkSync(path.join(uploadsDir, req.file.filename));
+        return res.status(400).json({ message: "Only image files are accepted for maintenance analysis" });
+      }
+
+      const filePath = path.join(uploadsDir, req.file.filename);
+      const fileUrl = `/uploads/${req.file.filename}`;
+
+      let analysis;
+      try {
+        analysis = await analyzeMaintenancePhoto(filePath);
+      } catch (aiErr: any) {
+        console.error("[mAInt] AI error:", aiErr.message);
+        return res.status(422).json({
+          message: "Could not analyze this photo. Please upload a clear image of the maintenance issue.",
+        });
+      }
+
+      res.json({ analysis, fileUrl });
+    } catch (err: any) {
+      console.error("[mAInt] Error:", err.message);
+      res.status(500).json({ message: "Something went wrong analyzing your photo. Please try again." });
     }
   });
 
