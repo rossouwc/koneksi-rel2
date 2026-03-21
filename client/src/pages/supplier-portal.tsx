@@ -374,9 +374,12 @@ function SubscribeFlow({
 function ProviderDashboardCard({ provider }: { provider: SupplierProvider }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const { data: dashboard } = useQuery<DashboardData>({ queryKey: ["/api/supplier/dashboard"] });
+  const { data: allEstates = [] } = useQuery<Estate[]>({ queryKey: ["/api/supplier/estates"] });
   const tiers = dashboard?.tiers || [];
   const tierName = provider.tier?.name || "Free";
   const gradientClass = tierColors[tierName] || "from-gray-500 to-gray-600";
+
+  const visibleEstates = allEstates.filter((e) => provider.visibleEstateIds.includes(e.id));
 
   const mockViews = Math.floor(Math.random() * 200 + 50);
   const mockClicks = Math.floor(mockViews * (0.1 + Math.random() * 0.15));
@@ -435,6 +438,40 @@ function ProviderDashboardCard({ provider }: { provider: SupplierProvider }) {
             {provider.visibleEstateIds.length} estate{provider.visibleEstateIds.length !== 1 ? "s" : ""}
           </div>
         </div>
+
+        {visibleEstates.length > 0 && (
+          <div className="rounded-xl border border-border/50 p-3 space-y-2" data-testid="section-visible-estates">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5" />
+              Visible in {visibleEstates.length} estate{visibleEstates.length !== 1 ? "s" : ""}
+            </p>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+              {visibleEstates.map((estate) => (
+                <div
+                  key={estate.id}
+                  className="flex items-center gap-2 text-sm"
+                  data-testid={`visible-estate-${estate.id}`}
+                >
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                  <span className="font-medium truncate">{estate.name}</span>
+                  {(estate.city || estate.suburb) && (
+                    <span className="text-[10px] text-muted-foreground truncate">
+                      · {[estate.suburb, estate.city].filter(Boolean).join(", ")}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {provider.visibleEstateIds.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border/50 p-3 text-center" data-testid="section-no-visible-estates">
+            <Building2 className="w-5 h-5 mx-auto text-muted-foreground/40 mb-1" />
+            <p className="text-xs text-muted-foreground">Not yet visible in any estate</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5">Upgrade your plan to select estates</p>
+          </div>
+        )}
 
         {provider.subscription?.status === "active" && (
           <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">

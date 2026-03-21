@@ -7,10 +7,7 @@ import { useTheme } from "@/lib/theme";
 import { usePortal } from "@/lib/portal-context";
 import {
   LayoutDashboard,
-  Receipt,
-  Zap,
   Store,
-  ShoppingBag,
   Shield,
   Menu,
   X,
@@ -20,8 +17,6 @@ import {
   Building2,
   ChevronDown,
   UserCircle,
-  Plus,
-  Bell,
   Briefcase,
   Home,
 } from "lucide-react";
@@ -40,11 +35,8 @@ const PROPERTY_PREFIX = "prop_";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/bills", label: "Bills", icon: Receipt },
-  { path: "/outages", label: "Outages", icon: Zap },
-  { path: "/alerts", label: "Alerts", icon: Bell },
   { path: "/providers", label: "Providers", icon: Store },
-  { path: "/marketplace", label: "Market", icon: ShoppingBag },
+  { path: "/join-estate", label: "Estates", icon: Building2 },
 ];
 
 function AvatarDropdown() {
@@ -150,10 +142,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = user?.isSuperAdmin || user?.role === "super_admin";
 
-  const allNavItems = [
-    ...navItems,
-    { path: "/join-estate", label: "Estates", icon: Building2 },
-  ];
+  const allNavItems = navItems;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -265,18 +254,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   )}
                 </SelectContent>
               </Select>
-
-              <Link href="/join-estate">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  data-testid="button-join-estate-nav"
-                  className="rounded-lg hidden md:flex"
-                  title="Join or manage estates"
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </Link>
 
               <Button
                 size="icon"

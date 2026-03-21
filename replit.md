@@ -69,23 +69,25 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 ## Pages
 - Auth page (login/register) with Google OAuth button (placeholder), password reset link, glassmorphic forms
 - Profile setup page - shown after first login if profile incomplete (phone, suburb fields)
-- `/` - Dashboard when authenticated
-- `/bills` - Bill management with add dialog
-- `/outages` - Outage reporting and tracking + EskomSePush live load shedding (national status, area events, area linking)
+- `/` - Dashboard: estate banner with invite code, provider count stat, pending resident/provider actions for admins, "Browse Providers" and "Manage Estates" quick-action cards; empty state for users with no estate
 - `/providers` - Service providers directory: searchable + filterable (category, rating, services), provider detail view with reviews + reviewer names, review submission with star ratings, phone/WhatsApp/email/website contact buttons
   - Residents: browse approved providers, "Recommend a Provider" (pending admin approval), "Invite a Provider" (unregistered providers)
   - Estate Admins: admin panel with tabs (Pending / Browse / Invitations), approve/reject recommendations, add registered providers from platform, view resident invitations
 - `/join-estate` - Join estate via invite code + view current estates + manage standalone properties + create estate (admin only)
-- `/bill-analyzer` - AI-powered bill analysis: drag-drop/camera upload, hardcoded sample analysis, results cards (extracted data, overcharges, savings tips), saves to bills table
-- `/alerts` - Outage alerts with Leaflet map view, list view, FAB to report, photo upload, type filtering, polling
-- `/marketplace` - Product marketplace: responsive grid of estate/home products (water tanks, solar gear, security, etc.), category chips, search, product cards with images/pricing/badges, "View Deal" affiliate buttons
-- `/supplier` - Supplier portal overview: business listings dashboard, create listing dialog, tier pricing preview, upgrade flow with PayFast payment, confetti on upgrade
+- `/supplier` - Supplier portal overview: business listings dashboard, create listing dialog, estates visibility section (shows which estates supplier is approved in), tier pricing preview, upgrade flow with PayFast payment, confetti on upgrade
 - `/supplier/profile` - Standalone supplier profile editor (business name, services, website, phone)
 - `/supplier/calendar` - Calendar & availability management
 - `/supplier/bookings` - Bookings & inquiries tracker (pending/confirmed/completed stats)
 - `/supplier/analytics` - Analytics dashboard (profile views, clicks, inquiries, charts)
 - `/supplier/billing` - Subscription & billing: current plan display, 5-tier pricing cards, upgrade/downgrade buttons
 - `/admin` - Super admin portal with DataTable views, estate detail sub-view, create/edit dialogs, supplier approvals tab (requires super_admin role)
+
+## Hidden pages (routes kept in code, removed from navigation)
+- `/bills` - Bill management (hidden, not linked from nav)
+- `/outages` - Outage reporting + EskomSePush (hidden, not linked from nav)
+- `/alerts` - Outage alerts with map (hidden, not linked from nav)
+- `/bill-analyzer` - AI bill analysis (hidden, not linked from nav)
+- `/marketplace` - Product marketplace (hidden, not linked from nav)
 
 ## Key UI Features
 - Estate selector dropdown with "Personal" + estates + "+" button to join/manage estates
