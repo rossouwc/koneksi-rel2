@@ -15,6 +15,8 @@ import {
   UserPlus,
   ChevronRight,
   Home,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -99,6 +101,74 @@ function EmptyEstateState() {
   );
 }
 
+function PendingMembershipState({ pendingEstates }: { pendingEstates: Array<{ id: string; name: string; suburb?: string | null; city?: string | null }> }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.4 }}
+      className="space-y-4"
+      data-testid="section-pending-membership"
+    >
+      <div className="glass-card rounded-2xl p-6">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+            <Clock className="w-6 h-6 text-amber-500" />
+          </div>
+          <div>
+            <h2 className="font-bold text-lg">Approval Pending</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Your join request{pendingEstates.length > 1 ? "s are" : " is"} awaiting approval from the estate administrator. You'll get access once approved.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {pendingEstates.map((estate) => (
+            <div
+              key={estate.id}
+              className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800"
+              data-testid={`pending-membership-estate-${estate.id}`}
+            >
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate">{estate.name}</p>
+                {(estate.suburb || estate.city) && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                    <MapPin className="w-3 h-3" />
+                    {[estate.suburb, estate.city].filter(Boolean).join(", ")}
+                  </p>
+                )}
+              </div>
+              <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex-shrink-0">
+                Awaiting approval
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Link href="/join-estate">
+        <div className="glass-card rounded-2xl p-4 cursor-pointer hover:shadow-lg transition-shadow group" data-testid="link-manage-estates-pending">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Join another estate or add a property</p>
+                <p className="text-xs text-muted-foreground">Manage all your estates and properties</p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { currentEstate, currentProperty, isEstateAdmin, isPersonalMode, approvedEstates, pendingEstates, properties } = useEstate();
@@ -112,6 +182,7 @@ export default function Dashboard() {
 
   const { data: providers = [], isLoading: providersLoading } = useQuery<Provider[]>({
     queryKey: [providersUrl],
+    enabled: !!(currentEstate || currentProperty),
   });
 
   const { data: pendingProviderCount = 0 } = useQuery<number>({
@@ -158,6 +229,8 @@ export default function Dashboard() {
   });
 
   const hasNoContext = isPersonalMode && approvedEstates.length === 0 && pendingEstates.length === 0 && properties.length === 0;
+  const hasPendingOnly = isPersonalMode && approvedEstates.length === 0 && pendingEstates.length > 0 && properties.length === 0;
+  const hasActiveContext = !!(currentEstate || currentProperty);
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -183,12 +256,16 @@ export default function Dashboard() {
               : `Viewing ${currentEstate.name}`
             : currentProperty
             ? `Viewing ${currentProperty.name}`
+            : hasPendingOnly
+            ? "Membership pending approval"
             : "Your personal dashboard"}
         </p>
       </motion.div>
 
       {hasNoContext ? (
         <EmptyEstateState />
+      ) : hasPendingOnly ? (
+        <PendingMembershipState pendingEstates={pendingEstates} />
       ) : (
         <>
           {currentEstate && (
@@ -197,6 +274,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.1, duration: 0.4 }}
               className="rounded-2xl p-6 gradient-teal relative overflow-hidden"
+              data-testid="section-estate-banner"
             >
               <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
               <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
@@ -210,6 +288,12 @@ export default function Dashboard() {
                 <h2 className="text-xl md:text-2xl font-bold text-white" data-testid="text-estate-name">
                   {currentEstate.name}
                 </h2>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-300 bg-white/10 px-2 py-0.5 rounded-full">
+                    <CheckCircle2 className="w-3 h-3" />
+                    {isEstateAdmin ? "Estate Admin" : "Member"}
+                  </span>
+                </div>
                 {isEstateAdmin && (
                   <p className="text-white/60 text-xs mt-2 flex items-center gap-1.5">
                     Invite code: <span className="font-mono bg-white/10 px-2 py-0.5 rounded">{currentEstate.inviteCode}</span>
@@ -242,13 +326,17 @@ export default function Dashboard() {
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Home className="w-5 h-5 text-primary" />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <h2 className="font-bold" data-testid="text-property-name">{currentProperty.name}</h2>
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3 h-3" />
                     {[currentProperty.streetAddress, currentProperty.suburb, currentProperty.city].filter(Boolean).join(", ") || "No location set"}
                   </p>
                 </div>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full flex-shrink-0">
+                  <Home className="w-3 h-3" />
+                  Your Property
+                </span>
               </div>
             </motion.div>
           )}
@@ -262,7 +350,7 @@ export default function Dashboard() {
               <>
                 <StatCard
                   title="Providers"
-                  value={providers.length}
+                  value={hasActiveContext ? providers.length : approvedEstates.length > 0 ? "—" : 0}
                   icon={Store}
                   color="bg-teal-600"
                   delay={0.15}
@@ -270,7 +358,7 @@ export default function Dashboard() {
                 />
                 {isEstateAdmin && currentEstate ? (
                   <StatCard
-                    title="Pending Residents"
+                    title="Pending Members"
                     value={pendingResidents.length}
                     icon={Users}
                     color={pendingResidents.length > 0 ? "bg-amber-500" : "bg-emerald-500"}
@@ -295,19 +383,26 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25, duration: 0.4 }}
-              className="glass-card rounded-2xl p-5"
+              className="glass-card rounded-2xl overflow-hidden"
               data-testid="section-pending-residents"
             >
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-amber-500" />
+              <Link href="/join-estate">
+                <div className="flex items-center justify-between gap-4 p-5 cursor-pointer hover:bg-muted/20 transition-colors group border-b border-border/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                      <Users className="w-5 h-5 text-amber-500" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm">Pending Member Approvals</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {pendingResidents.length} resident{pendingResidents.length !== 1 ? "s" : ""} awaiting approval
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-sm">Pending Residents</h3>
-                  <p className="text-xs text-muted-foreground">{pendingResidents.length} awaiting approval</p>
-                </div>
-              </div>
-              <div className="space-y-2">
+              </Link>
+              <div className="p-4 space-y-2">
                 {pendingResidents.map((r) => (
                   <div
                     key={r.userId}
@@ -369,7 +464,7 @@ export default function Dashboard() {
                         <Store className="w-5 h-5 text-amber-500" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-sm">Pending Providers</h3>
+                        <h3 className="font-semibold text-sm">Pending Provider Approvals</h3>
                         <p className="text-xs text-muted-foreground">
                           {pendingProviderCount} provider{pendingProviderCount !== 1 ? "s" : ""} awaiting approval
                         </p>
