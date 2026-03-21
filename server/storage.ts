@@ -11,9 +11,10 @@ import {
   type ProviderVisibleEstate,
   type UserProperty, type InsertUserProperty,
   type ProviderInvitation, type InsertProviderInvitation,
+  type MaintAnalysis, type InsertMaintAnalysis,
   users, estates, userEstates, bills, outages, providers, reviews,
   subscriptionTiers, providerSubscriptions, providerVisibleEstates,
-  userProperties, providerInvitations,
+  userProperties, providerInvitations, maintAnalyses,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or, inArray, sql } from "drizzle-orm";
@@ -82,6 +83,10 @@ export interface IStorage {
   getProviderInvitations(estateId: string): Promise<ProviderInvitation[]>;
   createProviderInvitation(data: InsertProviderInvitation): Promise<ProviderInvitation>;
   updateProviderInvitationStatus(id: string, status: string): Promise<ProviderInvitation>;
+
+  getMaintAnalyses(userId: string): Promise<MaintAnalysis[]>;
+  createMaintAnalysis(data: InsertMaintAnalysis): Promise<MaintAnalysis>;
+  deleteMaintAnalysis(id: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -507,6 +512,25 @@ export class DatabaseStorage implements IStorage {
   async updateProviderInvitationStatus(id: string, status: string): Promise<ProviderInvitation> {
     const [updated] = await db.update(providerInvitations).set({ status }).where(eq(providerInvitations.id, id)).returning();
     return updated;
+  }
+
+  async getMaintAnalyses(userId: string): Promise<MaintAnalysis[]> {
+    return db
+      .select()
+      .from(maintAnalyses)
+      .where(eq(maintAnalyses.userId, userId))
+      .orderBy(desc(maintAnalyses.createdAt));
+  }
+
+  async createMaintAnalysis(data: InsertMaintAnalysis): Promise<MaintAnalysis> {
+    const [created] = await db.insert(maintAnalyses).values(data).returning();
+    return created;
+  }
+
+  async deleteMaintAnalysis(id: string, userId: string): Promise<void> {
+    await db
+      .delete(maintAnalyses)
+      .where(and(eq(maintAnalyses.id, id), eq(maintAnalyses.userId, userId)));
   }
 }
 

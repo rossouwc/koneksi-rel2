@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEstate } from "@/lib/estate-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Camera,
   Wrench,
@@ -23,11 +24,16 @@ import {
   ArrowRight,
   Store,
   RotateCcw,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  History,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import type { Provider } from "@shared/schema";
+import type { Provider, MaintAnalysis } from "@shared/schema";
 
 interface MaintIssue {
   title: string;
@@ -58,10 +64,10 @@ const CATEGORY_CONFIG: Record<string, { icon: any; color: string; bgColor: strin
 };
 
 const SEVERITY_CONFIG = {
-  low: { label: "Low", color: "text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30" },
-  medium: { label: "Medium", color: "text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30" },
-  high: { label: "High", color: "text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30" },
-  urgent: { label: "Urgent", color: "text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30" },
+  low: { label: "Low", color: "text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30", dot: "bg-emerald-500" },
+  medium: { label: "Medium", color: "text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30", dot: "bg-amber-500" },
+  high: { label: "High", color: "text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30", dot: "bg-orange-500" },
+  urgent: { label: "Urgent", color: "text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30", dot: "bg-red-500" },
 };
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
@@ -86,6 +92,19 @@ function providerMatchesCategory(provider: Provider, categories: string[]): bool
     if (keywords.some((kw) => provider.category.toLowerCase().includes(kw))) return true;
   }
   return false;
+}
+
+function formatRelativeDate(dateStr: string | null | Date): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr as string);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? "s" : ""} ago`;
+  return date.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function UploadZone({
@@ -123,7 +142,9 @@ function UploadZone({
           </div>
         </div>
         <h3 className="font-semibold text-base mb-1">Analysing your photo...</h3>
-        <p className="text-sm text-muted-foreground mb-3">mAInt AI is identifying the issues and recommending the right tradespeople</p>
+        <p className="text-sm text-muted-foreground mb-3">
+          mAInt AI is identifying the issues and recommending the right tradespeople
+        </p>
         <div className="flex items-center justify-center gap-2">
           <Sparkles className="w-4 h-4 text-primary animate-pulse" />
           <span className="text-xs text-primary font-medium">Powered by AI Vision</span>
@@ -160,12 +181,11 @@ function UploadZone({
         </p>
         <div className="flex items-center justify-center gap-2 flex-wrap">
           <span className="text-xs px-3 py-1 rounded-full bg-muted text-muted-foreground">JPG, PNG, WebP</span>
-          <span className="text-xs px-3 py-1 rounded-full bg-muted text-muted-foreground">Max 10MB</span>
         </div>
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleFile(file);
@@ -175,7 +195,6 @@ function UploadZone({
           data-testid="input-maint-photo"
         />
       </div>
-
       <Button
         variant="outline"
         className="w-full rounded-xl h-12"
@@ -203,7 +222,6 @@ function UploadZone({
 function TradeCard({ issue, index }: { issue: MaintIssue; index: number }) {
   const config = CATEGORY_CONFIG[issue.category] || CATEGORY_CONFIG["General Maintenance"];
   const Icon = config.icon;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -404,7 +422,7 @@ function ResultsView({
             <p className="text-sm font-medium">No matching suppliers found</p>
             <p className="text-xs text-muted-foreground mt-1 mb-4">
               {estateId
-                ? "No approved suppliers in your estate match these trades yet. You can browse all providers or recommend one."
+                ? "No approved suppliers in your estate match these trades yet."
                 : "Select an estate or browse all providers to find help."}
             </p>
             <Link href="/providers">
@@ -420,13 +438,187 @@ function ResultsView({
   );
 }
 
+function HistoryItem({ item, estateId }: { item: MaintAnalysis; estateId?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const { toast } = useToast();
+
+  const issues: MaintIssue[] = (() => {
+    try { return JSON.parse(item.issues); } catch { return []; }
+  })();
+
+  const sevConfig = SEVERITY_CONFIG[item.severity as keyof typeof SEVERITY_CONFIG] || SEVERITY_CONFIG.medium;
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/maint/analyses/${item.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/maint/analyses"] });
+      toast({ title: "Deleted", description: "Maintenance record removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not delete this record.", variant: "destructive" });
+    },
+  });
+
+  const { data: providers = [] } = useQuery<Provider[]>({
+    queryKey: [estateId ? `/api/providers?estateId=${estateId}` : "/api/providers"],
+    enabled: expanded,
+  });
+
+  const requiredCategories = issues.map((i) => i.category);
+  const matchedProviders = providers.filter((p) => providerMatchesCategory(p, requiredCategories));
+
+  return (
+    <div className="glass-card rounded-2xl overflow-hidden" data-testid={`history-item-${item.id}`}>
+      <div className="flex items-start gap-3 p-4">
+        {item.photoUrl ? (
+          <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0">
+            <img
+              src={item.photoUrl}
+              alt={item.title}
+              className="w-full h-full object-cover"
+              data-testid={`history-photo-${item.id}`}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          </div>
+        ) : (
+          <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+            <Wrench className="w-6 h-6 text-muted-foreground/40" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-semibold text-sm leading-tight" data-testid={`history-title-${item.id}`}>{item.title}</p>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${sevConfig.color}`} data-testid={`history-severity-${item.id}`}>
+              {sevConfig.label}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <Clock className="w-3 h-3 text-muted-foreground/60" />
+            <span className="text-xs text-muted-foreground">{formatRelativeDate(item.createdAt)}</span>
+          </div>
+          {issues.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {issues.map((iss, i) => {
+                const cfg = CATEGORY_CONFIG[iss.category] || CATEGORY_CONFIG["General Maintenance"];
+                return (
+                  <span key={i} className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${cfg.bgColor} ${cfg.color}`}>
+                    {iss.category}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center border-t border-border/40 px-4 py-2 gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="flex-1 h-8 text-xs gap-1.5 rounded-lg"
+          onClick={() => setExpanded((v) => !v)}
+          data-testid={`button-history-expand-${item.id}`}
+        >
+          {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          {expanded ? "Hide details" : "View details"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 rounded-lg text-destructive hover:bg-destructive/10 flex-shrink-0"
+          onClick={() => deleteMutation.mutate()}
+          disabled={deleteMutation.isPending}
+          data-testid={`button-history-delete-${item.id}`}
+        >
+          {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+        </Button>
+      </div>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 space-y-4 border-t border-border/40 pt-4">
+              {item.description && (
+                <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+              )}
+              {issues.length > 0 && (
+                <div className={`grid gap-3 ${issues.length > 1 ? "sm:grid-cols-2" : ""}`}>
+                  {issues.map((issue, i) => (
+                    <TradeCard key={i} issue={issue} index={i} />
+                  ))}
+                </div>
+              )}
+              {matchedProviders.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Matched Suppliers</p>
+                  {matchedProviders.map((p) => <ProviderMatch key={p.id} provider={p} />)}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function HistoryTab({ estateId }: { estateId?: string }) {
+  const { data: analyses = [], isLoading } = useQuery<MaintAnalysis[]>({
+    queryKey: ["/api/maint/analyses"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="glass-card rounded-2xl h-24 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (analyses.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card rounded-2xl p-10 text-center"
+        data-testid="section-history-empty"
+      >
+        <History className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+        <p className="font-semibold">No saved diagnoses yet</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Upload a photo to analyse a maintenance issue — results are saved automatically.
+        </p>
+      </motion.div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        {analyses.length} saved diagnosis{analyses.length !== 1 ? "es" : ""}
+      </p>
+      {analyses.map((item) => (
+        <HistoryItem key={item.id} item={item} estateId={estateId} />
+      ))}
+    </div>
+  );
+}
+
 export default function MaintPage() {
   const { currentEstate } = useEstate();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<"diagnose" | "history">("diagnose");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [result, setResult] = useState<MaintAnalysisResult | null>(null);
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
 
   const handleFileSelect = useCallback(
     async (file: File, preview: string) => {
@@ -437,6 +629,7 @@ export default function MaintPage() {
       try {
         const formData = new FormData();
         formData.append("photo", file);
+        if (currentEstate?.id) formData.append("estateId", currentEstate.id);
 
         const res = await fetch("/api/maint/analyze", {
           method: "POST",
@@ -451,7 +644,7 @@ export default function MaintPage() {
 
         const data = await res.json();
         setResult(data.analysis);
-        setFileUrl(data.fileUrl);
+        queryClient.invalidateQueries({ queryKey: ["/api/maint/analyses"] });
       } catch (err: any) {
         toast({
           title: "Analysis failed",
@@ -463,13 +656,12 @@ export default function MaintPage() {
         setIsAnalyzing(false);
       }
     },
-    [toast]
+    [toast, currentEstate?.id]
   );
 
   const handleReset = () => {
     setResult(null);
     setPreviewSrc(null);
-    setFileUrl(null);
     setIsAnalyzing(false);
   };
 
@@ -479,6 +671,7 @@ export default function MaintPage() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
+        className="flex items-start justify-between gap-3"
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl gradient-teal flex items-center justify-center flex-shrink-0">
@@ -493,60 +686,100 @@ export default function MaintPage() {
         </div>
       </motion.div>
 
-      {!result && !isAnalyzing && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.4 }}
-          className="rounded-2xl p-4 bg-primary/5 border border-primary/20"
+      <div className="flex items-center rounded-xl bg-muted/50 p-1 gap-1">
+        <button
+          className={`flex-1 flex items-center justify-center gap-2 text-sm font-medium py-2 rounded-lg transition-all duration-200 ${
+            activeTab === "diagnose"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+          onClick={() => setActiveTab("diagnose")}
+          data-testid="tab-diagnose"
         >
-          <div className="flex items-start gap-3">
-            <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium">How it works</p>
-              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                Take or upload a photo of something that needs fixing in your home. Our AI will identify what's wrong, assess the severity, recommend the right tradespeople — and show you approved suppliers from your estate.
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
+          <Sparkles className="w-3.5 h-3.5" />
+          Diagnose
+        </button>
+        <button
+          className={`flex-1 flex items-center justify-center gap-2 text-sm font-medium py-2 rounded-lg transition-all duration-200 ${
+            activeTab === "history"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+          onClick={() => setActiveTab("history")}
+          data-testid="tab-history"
+        >
+          <History className="w-3.5 h-3.5" />
+          History
+        </button>
+      </div>
 
       <AnimatePresence mode="wait">
-        {result && previewSrc ? (
-          <ResultsView
-            key="results"
-            result={result}
-            previewSrc={previewSrc}
-            estateId={currentEstate?.id}
-            onReset={handleReset}
-          />
-        ) : (
+        {activeTab === "diagnose" ? (
           <motion.div
-            key="upload"
+            key="diagnose-tab"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-5"
           >
-            <UploadZone onFileSelect={handleFileSelect} isAnalyzing={isAnalyzing} />
+            {!result && !isAnalyzing && (
+              <div className="rounded-2xl p-4 bg-primary/5 border border-primary/20">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">How it works</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                      Take or upload a photo of something that needs fixing. Our AI will identify what's wrong, assess the severity, recommend the right tradespeople — and match you with approved suppliers from your estate. Results are saved automatically.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <AnimatePresence mode="wait">
+              {result && previewSrc ? (
+                <ResultsView
+                  key="results"
+                  result={result}
+                  previewSrc={previewSrc}
+                  estateId={currentEstate?.id}
+                  onReset={handleReset}
+                />
+              ) : (
+                <motion.div
+                  key="upload"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <UploadZone onFileSelect={handleFileSelect} isAnalyzing={isAnalyzing} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {result && result.issues.length === 0 && (
+              <div className="glass-card rounded-2xl p-5 text-center" data-testid="section-no-issues">
+                <AlertTriangle className="w-8 h-8 mx-auto text-amber-500 mb-2" />
+                <p className="text-sm font-medium">No maintenance issue detected</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Try uploading a clearer photo that shows the problem area more clearly.
+                </p>
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="history-tab"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <HistoryTab estateId={currentEstate?.id} />
           </motion.div>
         )}
       </AnimatePresence>
-
-      {result && result.issues.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card rounded-2xl p-5 text-center"
-          data-testid="section-no-issues"
-        >
-          <AlertTriangle className="w-8 h-8 mx-auto text-amber-500 mb-2" />
-          <p className="text-sm font-medium">No maintenance issue detected</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Try uploading a clearer photo that shows the problem area more clearly.
-          </p>
-        </motion.div>
-      )}
     </div>
   );
 }

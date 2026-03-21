@@ -179,6 +179,19 @@ export const providerVisibleEstates = pgTable("provider_visible_estates", {
   estateId: varchar("estate_id").notNull(),
 });
 
+export const maintAnalyses = pgTable("maint_analyses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  estateId: varchar("estate_id"),
+  propertyId: varchar("property_id"),
+  photoUrl: text("photo_url"),
+  title: text("title").notNull(),
+  description: text("description"),
+  severity: text("severity").notNull(),
+  issues: text("issues").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, isSuperAdmin: true, profileComplete: true, role: true, approvalStatus: true });
 export const insertEstateSchema = createInsertSchema(estates).omit({ id: true, createdAt: true, inviteCode: true });
 export const insertUserEstateSchema = createInsertSchema(userEstates).omit({ id: true, joinedAt: true });
@@ -191,6 +204,7 @@ export const insertProviderSubscriptionSchema = createInsertSchema(providerSubsc
 export const insertProviderVisibleEstateSchema = createInsertSchema(providerVisibleEstates).omit({ id: true });
 export const insertUserPropertySchema = createInsertSchema(userProperties).omit({ id: true, createdAt: true });
 export const insertProviderInvitationSchema = createInsertSchema(providerInvitations).omit({ id: true, createdAt: true, status: true });
+export const insertMaintAnalysisSchema = createInsertSchema(maintAnalyses).omit({ id: true, createdAt: true });
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -254,3 +268,5 @@ export type UserProperty = typeof userProperties.$inferSelect;
 export type InsertUserProperty = z.infer<typeof insertUserPropertySchema>;
 export type ProviderInvitation = typeof providerInvitations.$inferSelect;
 export type InsertProviderInvitation = z.infer<typeof insertProviderInvitationSchema>;
+export type MaintAnalysis = typeof maintAnalyses.$inferSelect;
+export type InsertMaintAnalysis = z.infer<typeof insertMaintAnalysisSchema>;

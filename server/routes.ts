@@ -633,6 +633,8 @@ export async function registerRoutes(
 
   app.post("/api/maint/analyze", requireAuth, upload.single("photo"), async (req, res) => {
     try {
+      const userId = req.session.userId!;
+
       if (!req.file) {
         return res.status(400).json({ message: "No image uploaded" });
       }
@@ -656,10 +658,41 @@ export async function registerRoutes(
         });
       }
 
-      res.json({ analysis, fileUrl });
+      const saved = await storage.createMaintAnalysis({
+        userId,
+        estateId: req.body.estateId && req.body.estateId !== "null" ? req.body.estateId : null,
+        propertyId: req.body.propertyId && req.body.propertyId !== "null" ? req.body.propertyId : null,
+        photoUrl: fileUrl,
+        title: analysis.title,
+        description: analysis.description,
+        severity: analysis.severity,
+        issues: JSON.stringify(analysis.issues),
+      });
+
+      res.json({ analysis, fileUrl, id: saved.id });
     } catch (err: any) {
       console.error("[mAInt] Error:", err.message);
       res.status(500).json({ message: "Something went wrong analyzing your photo. Please try again." });
+    }
+  });
+
+  app.get("/api/maint/analyses", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const analyses = await storage.getMaintAnalyses(userId);
+      res.json(analyses);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/maint/analyses/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      await storage.deleteMaintAnalysis(req.params.id, userId);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 
