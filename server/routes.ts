@@ -637,7 +637,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "No image uploaded" });
       }
 
-      const imageMimes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+      const imageMimes = ["image/jpeg", "image/png", "image/webp"];
       if (!imageMimes.includes(req.file.mimetype)) {
         fs.unlinkSync(path.join(uploadsDir, req.file.filename));
         return res.status(400).json({ message: "Only image files are accepted for maintenance analysis" });

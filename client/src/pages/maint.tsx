@@ -11,7 +11,6 @@ import {
   Bug,
   Paintbrush,
   Sun,
-  Shield,
   Waves,
   HardHat,
   FileUp,
@@ -22,7 +21,6 @@ import {
   Mail,
   MessageSquare,
   ArrowRight,
-  X,
   Store,
   RotateCcw,
 } from "lucide-react";
@@ -233,7 +231,7 @@ function TradeCard({ issue, index }: { issue: MaintIssue; index: number }) {
   );
 }
 
-function ProviderMatch({ provider, index }: { provider: Provider; index: number }) {
+function ProviderMatch({ provider }: { provider: Provider }) {
   return (
     <div
       className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border/40"
@@ -286,13 +284,11 @@ function ProviderMatch({ provider, index }: { provider: Provider; index: number 
 
 function ResultsView({
   result,
-  fileUrl,
   previewSrc,
   estateId,
   onReset,
 }: {
   result: MaintAnalysisResult;
-  fileUrl: string;
   previewSrc: string;
   estateId?: string;
   onReset: () => void;
@@ -392,8 +388,8 @@ function ResultsView({
             <p className="text-xs text-muted-foreground mb-3">
               {matchedProviders.length} approved supplier{matchedProviders.length !== 1 ? "s" : ""} can help with the identified issues
             </p>
-            {matchedProviders.map((p, i) => (
-              <ProviderMatch key={p.id} provider={p} index={i} />
+            {matchedProviders.map((p) => (
+              <ProviderMatch key={p.id} provider={p} />
             ))}
           </motion.div>
         ) : (
@@ -517,11 +513,10 @@ export default function MaintPage() {
       )}
 
       <AnimatePresence mode="wait">
-        {result && previewSrc && fileUrl ? (
+        {result && previewSrc ? (
           <ResultsView
             key="results"
             result={result}
-            fileUrl={fileUrl}
             previewSrc={previewSrc}
             estateId={currentEstate?.id}
             onReset={handleReset}
