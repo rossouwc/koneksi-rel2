@@ -13,7 +13,7 @@ function EmailShell({
     <div
       style={{
         minHeight: "100vh",
-        background: "#e5e7eb",
+        background: TEAL_GRADIENT,
         fontFamily: FONT_FAMILY,
         display: "flex",
         flexDirection: "column",
@@ -25,7 +25,7 @@ function EmailShell({
       <div
         style={{
           width: 600,
-          background: "#f3f4f6",
+          background: "#ffffff",
           borderRadius: 12,
           overflow: "hidden",
           boxShadow: "0 4px 24px rgba(0,0,0,0.10)",

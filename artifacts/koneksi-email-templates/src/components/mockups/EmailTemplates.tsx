@@ -27,7 +27,7 @@ function EmailTemplate({
         width: 600,
         minWidth: 600,
         maxWidth: 600,
-        backgroundColor: "#f3f4f6",
+        backgroundColor: "#ffffff",
         fontFamily: FONT_FAMILY,
         borderRadius: 12,
         overflow: "hidden",
@@ -276,7 +276,7 @@ export default function EmailTemplates() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#e5e7eb",
+        background: TEAL_GRADIENT,
         fontFamily: FONT_FAMILY,
         padding: "40px 32px",
       }}
@@ -287,14 +287,14 @@ export default function EmailTemplates() {
             style={{
               fontSize: 26,
               fontWeight: 800,
-              color: "#111827",
+              color: "#ffffff",
               margin: "0 0 8px",
               letterSpacing: "-0.5px",
             }}
           >
             Koneksi — Email Template Mockups
           </h1>
-          <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>
+          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.8)", margin: 0 }}>
             All 4 transactional email designs · 600px width · Plus Jakarta Sans · Teal gradient (#0f766e → #10b981)
           </p>
         </div>
@@ -321,7 +321,7 @@ export default function EmailTemplates() {
                   style={{
                     fontSize: 14,
                     fontWeight: 700,
-                    color: "#111827",
+                    color: "#ffffff",
                   }}
                 >
                   {label}

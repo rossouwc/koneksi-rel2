@@ -6,30 +6,30 @@ function baseLayout(title: string, bodyContent: string, footerNote?: string): st
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:32px 16px;">
+<body style="margin:0;padding:0;background-color:#0d9488;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0d9488;background:linear-gradient(135deg,#0f766e 0%,#10b981 100%);padding:40px 16px;">
     <tr>
       <td align="center">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,#0d9488 0%,#0f766e 100%);border-radius:12px 12px 0 0;padding:36px 40px;text-align:center;">
-              <span style="font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Koneksi</span>
-              <p style="margin:6px 0 0;font-size:13px;color:#99f6e4;letter-spacing:0.5px;">${title}</p>
+            <td style="padding:0 0 28px;text-align:center;">
+              <span style="font-size:30px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Koneksi</span>
+              <p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,0.85);letter-spacing:0.5px;">${title}</p>
             </td>
           </tr>
 
           <!-- Body card -->
           <tr>
-            <td style="background:#ffffff;padding:40px 40px 32px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
+            <td style="background:#ffffff;padding:40px 40px 32px;border-radius:12px 12px 0 0;">
               ${bodyContent}
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:20px 40px;text-align:center;">
+            <td style="background:#f0fdf9;border-top:1px solid #d1fae5;border-radius:0 0 12px 12px;padding:20px 40px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#9ca3af;">
                 ${footerNote || "You are receiving this email because of activity on your Koneksi estate account."}
               </p>
