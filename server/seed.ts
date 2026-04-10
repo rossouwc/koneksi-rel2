@@ -15,14 +15,24 @@ export async function seedDatabase() {
   await storage.setSystemSetting("test_email", (await storage.getSystemSetting("test_email")) ?? "rossouw@hoolio.co.za");
   await storage.setSystemSetting("test_phone", (await storage.getSystemSetting("test_phone")) ?? "0828224487");
 
-  const existingAdmin = await storage.getUserByEmail("admin@koneksi.app");
-  if (existingAdmin) return;
+  const existingAdmin =
+    await storage.getUserByEmail("koneksi@hoolio.co.za") ||
+    await storage.getUserByEmail("admin@koneksi.app");
+  if (existingAdmin) {
+    if (existingAdmin.email === "admin@koneksi.app") {
+      const { db } = await import("./db");
+      const { users } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.update(users).set({ email: "koneksi@hoolio.co.za" }).where(eq(users.id, existingAdmin.id));
+    }
+    return;
+  }
 
   const adminPassword = await hashPassword("admin123");
   const admin = await storage.createUser({
-    email: "admin@koneksi.app",
+    email: "koneksi@hoolio.co.za",
     password: adminPassword,
-    fullName: "Admin User",
+    fullName: "Koneksi Admin",
   });
 
   const { db } = await import("./db");

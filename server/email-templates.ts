@@ -178,6 +178,38 @@ export function providerRejectedEmail(
   return { subject, html, text };
 }
 
+export function newSupplierRegistrationEmail(
+  businessName: string,
+  supplierEmail: string,
+  services: string[],
+  phone: string,
+  adminUrl: string
+): { subject: string; html: string; text: string } {
+  const subject = `New Supplier Registration — ${businessName} awaits approval`;
+
+  const bodyContent = `
+    ${greeting("Koneksi Admin")}
+    ${paragraph(`A new supplier has registered on Koneksi and is awaiting your review and approval.`)}
+    ${divider()}
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+      ${infoRow("Business:", businessName)}
+      ${infoRow("Email:", supplierEmail)}
+      ${infoRow("Phone:", phone)}
+      ${infoRow("Services:", services.slice(0, 5).join(", ") + (services.length > 5 ? ` +${services.length - 5} more` : ""))}
+    </table>
+    ${divider()}
+    ${paragraph("Please log in to the admin dashboard to review their application and approve or reject them.")}
+    ${ctaButton(adminUrl, "Review Supplier")}
+    ${paragraph(`<span style="font-size:13px;color:#9ca3af;">The supplier will remain in a pending state until you take action.</span>`)}
+  `;
+
+  const html = baseLayout("New Supplier Registration", bodyContent, "This notification was sent because a new supplier registered on Koneksi.");
+
+  const text = `New Supplier Registration\n\nA new supplier has registered and is awaiting approval.\n\nBusiness: ${businessName}\nEmail: ${supplierEmail}\nPhone: ${phone}\nServices: ${services.join(", ")}\n\nLog in to review: ${adminUrl}`;
+
+  return { subject, html, text };
+}
+
 export function smtpTestEmail(
   host: string,
   port: number,

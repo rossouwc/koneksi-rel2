@@ -14,9 +14,9 @@ import { analyzeMaintenancePhoto } from "./openai-maint-analyzer";
 import { buildPayFastUrl, validatePayFastITN } from "./payfast";
 import { searchAreas, getAreaInfo, getStatus as getEspStatus } from "./eskomsepush";
 import { sendEmail, sendSms } from "./notifications";
-import { providerInviteEmail, adminInviteNotificationEmail, providerApprovedEmail, providerRejectedEmail } from "./email-templates";
+import { providerInviteEmail, adminInviteNotificationEmail, providerApprovedEmail, providerRejectedEmail, newSupplierRegistrationEmail } from "./email-templates";
 import { db } from "./db";
-import { users, estates, userEstates, bills, outages, providers, reviews, providerVisibleEstates } from "@shared/schema";
+import { users, estates, userEstates, bills, outages, providers, reviews, providerVisibleEstates, providerSubscriptions } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 
 const uploadsDir = path.resolve("uploads");
@@ -194,6 +194,18 @@ export async function registerRoutes(
           }).where(eq(users.id, existing.id)).returning();
 
           req.session.userId = updated.id;
+
+          (async () => {
+            try {
+              const [superAdmin] = await db.select().from(users).where(eq(users.isSuperAdmin, true)).limit(1);
+              if (superAdmin?.email) {
+                const adminUrl = `${req.protocol}://${req.get("host")}/admin`;
+                const tmpl = newSupplierRegistrationEmail(businessName, email, services || [], phone || "", adminUrl);
+                await sendEmail(superAdmin.email, tmpl.subject, tmpl.text, tmpl.html);
+              }
+            } catch (_) {}
+          })();
+
           return res.json({ ...updated, password: undefined });
         }
 
@@ -249,6 +261,18 @@ export async function registerRoutes(
         }).returning();
 
         req.session.userId = user.id;
+
+        (async () => {
+          try {
+            const [superAdmin] = await db.select().from(users).where(eq(users.isSuperAdmin, true)).limit(1);
+            if (superAdmin?.email) {
+              const adminUrl = `${req.protocol}://${req.get("host")}/admin`;
+              const tmpl = newSupplierRegistrationEmail(businessName, email, services || [], phone || "", adminUrl);
+              await sendEmail(superAdmin.email, tmpl.subject, tmpl.text, tmpl.html);
+            }
+          } catch (_) {}
+        })();
+
         return res.json({ ...user, password: undefined });
       }
 
@@ -1626,9 +1650,10 @@ export async function registerRoutes(
       }
       await db.update(users).set({ approvalStatus: "approved" }).where(eq(users.id, supplier.id));
 
+      let providerRecord: typeof providers.$inferSelect | undefined;
       const existingProviders = await storage.getProvidersByUserId(supplier.id);
       if (existingProviders.length === 0) {
-        await storage.createProvider({
+        providerRecord = await storage.createProvider({
           name: supplier.businessName || supplier.fullName,
           category: (supplier.services && supplier.services.length > 0) ? supplier.services[0].toLowerCase() : "other",
           phone: supplier.phone || null,
@@ -1637,7 +1662,21 @@ export async function registerRoutes(
           services: supplier.services || null,
           providerApprovalStatus: "approved",
         });
+      } else {
+        providerRecord = existingProviders[0];
       }
+
+      if (providerRecord) {
+        const existingSub = await storage.getProviderSubscription(providerRecord.id);
+        if (!existingSub) {
+          await db.insert(providerSubscriptions).values({
+            providerId: providerRecord.id,
+            tierId: "tier-free",
+            status: "active",
+          });
+        }
+      }
+
       res.json({ message: "Supplier approved" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
