@@ -1174,6 +1174,7 @@ function AdminBrowseTab({ estateId }: { estateId: string }) {
 }
 
 function AdminInvitationsTab({ estateId }: { estateId: string }) {
+  const { toast } = useToast();
   const { data: invitations = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/estates", estateId, "invitations"],
     queryFn: async () => {
@@ -1200,60 +1201,117 @@ function AdminInvitationsTab({ estateId }: { estateId: string }) {
     );
   }
 
+  const statusLabel: Record<string, string> = {
+    pending: "Invited",
+    sent: "Sent",
+    registered: "Registered",
+    approved: "Approved",
+    rejected: "Rejected",
+  };
+  const statusColor: Record<string, string> = {
+    pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+    sent: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    registered: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+    approved: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+    rejected: "bg-red-500/10 text-red-600 border-red-500/20",
+  };
+
+  const appUrl = window.location.origin;
+
   return (
     <div className="space-y-2">
-      {invitations.map((inv: any) => (
-        <motion.div
-          key={inv.id}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card rounded-xl p-3"
-          data-testid={`card-invitation-${inv.id}`}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h4 className="font-medium text-sm truncate">{inv.providerName}</h4>
-              {inv.category && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize inline-block mt-0.5">
-                  {inv.category}
-                </span>
-              )}
-              <div className="flex flex-col gap-0.5 mt-1">
-                {inv.providerEmail && (
-                  <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <Mail className="w-2.5 h-2.5" />
-                    {inv.providerEmail}
-                  </p>
+      {invitations.map((inv: any) => {
+        const inviteUrl = inv.token ? `${appUrl}/join-provider?token=${inv.token}` : null;
+        return (
+          <motion.div
+            key={inv.id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card rounded-xl p-3 space-y-2"
+            data-testid={`card-invitation-${inv.id}`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h4 className="font-medium text-sm truncate">{inv.providerName}</h4>
+                {inv.category && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize inline-block mt-0.5">
+                    {inv.category}
+                  </span>
                 )}
-                {inv.providerPhone && (
-                  <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <Phone className="w-2.5 h-2.5" />
-                    {inv.providerPhone}
+                <div className="flex flex-col gap-0.5 mt-1">
+                  {inv.providerEmail && (
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Mail className="w-2.5 h-2.5" />
+                      {inv.providerEmail}
+                    </p>
+                  )}
+                  {inv.providerPhone && (
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Phone className="w-2.5 h-2.5" />
+                      {inv.providerPhone}
+                    </p>
+                  )}
+                </div>
+                {inv._invitedByName && (
+                  <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                    <User className="w-2.5 h-2.5" />
+                    Invited by {inv._invitedByName}
                   </p>
                 )}
               </div>
-              {inv._invitedByName && (
-                <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
-                  <User className="w-2.5 h-2.5" />
-                  Invited by {inv._invitedByName}
-                </p>
-              )}
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                <Badge
+                  variant="outline"
+                  className={`text-[9px] px-2 py-0.5 rounded-full ${statusColor[inv.status] || "bg-muted text-muted-foreground border-muted"}`}
+                >
+                  {statusLabel[inv.status] || inv.status}
+                </Badge>
+                {inv.statusUpdatedAt && (
+                  <p className="text-[9px] text-muted-foreground">
+                    {new Date(inv.statusUpdatedAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
             </div>
-            <Badge
-              variant="outline"
-              className={`text-[9px] px-2 py-0.5 rounded-full flex-shrink-0 ${
-                inv.status === "pending"
-                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                  : inv.status === "registered"
-                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                  : "bg-muted text-muted-foreground border-muted"
-              }`}
-            >
-              {inv.status === "pending" ? "Pending" : inv.status === "registered" ? "Registered" : inv.status}
-            </Badge>
-          </div>
-        </motion.div>
-      ))}
+
+            <div className="flex items-center gap-1 pt-1 border-t border-border/30 overflow-x-auto">
+              {(["pending", "sent", "registered", inv.status === "rejected" ? "rejected" : "approved"] as string[]).map((step, i) => {
+                const linearOrder = ["pending", "sent", "registered", inv.status === "rejected" ? "rejected" : "approved"];
+                const statusIdx = linearOrder.indexOf(inv.status);
+                const stepIdx = linearOrder.indexOf(step);
+                const isActive = statusIdx >= 0 && stepIdx <= statusIdx;
+                const isCurrent = step === inv.status;
+                const isLast = i === 3;
+                return (
+                  <div key={step} className="flex items-center gap-1 flex-shrink-0">
+                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? (step === "rejected" ? "bg-red-500" : "bg-primary") : "bg-border"}`} />
+                    <span className={`text-[9px] whitespace-nowrap ${isCurrent ? (step === "rejected" ? "text-red-500 font-medium" : "text-primary font-medium") : isActive ? "text-foreground" : "text-muted-foreground"}`}>
+                      {statusLabel[step]}
+                    </span>
+                    {!isLast && <div className={`h-px w-3 flex-shrink-0 ${isActive ? (step === "rejected" ? "bg-red-500/40" : "bg-primary/40") : "bg-border"}`} />}
+                  </div>
+                );
+              })}
+            </div>
+
+            {inviteUrl && (
+              <div className="flex items-center gap-2 pt-0.5">
+                <p className="text-[9px] text-muted-foreground truncate flex-1 font-mono">{inviteUrl}</p>
+                <button
+                  data-testid={`button-copy-invite-link-${inv.id}`}
+                  onClick={() => {
+                    navigator.clipboard.writeText(inviteUrl);
+                    toast({ title: "Link copied", description: "Invite link copied to clipboard" });
+                  }}
+                  className="text-[9px] text-primary flex items-center gap-0.5 flex-shrink-0 hover:underline"
+                >
+                  Copy link
+                </button>
+              </div>
+            )}
+          </motion.div>
+        );
+      })}
     </div>
   );
 }

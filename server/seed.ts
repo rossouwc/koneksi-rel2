@@ -11,6 +11,10 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 export async function seedDatabase() {
+  await storage.setSystemSetting("notification_mode", (await storage.getSystemSetting("notification_mode")) ?? "test");
+  await storage.setSystemSetting("test_email", (await storage.getSystemSetting("test_email")) ?? "rossouw@hoolio.co.za");
+  await storage.setSystemSetting("test_phone", (await storage.getSystemSetting("test_phone")) ?? "0828224487");
+
   const existingAdmin = await storage.getUserByEmail("admin@koneksi.app");
   if (existingAdmin) return;
 

@@ -32,6 +32,8 @@ import {
   Briefcase,
   Clock,
   Trash2,
+  Bell,
+  FlaskConical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1145,6 +1147,146 @@ function PendingSuppliers() {
   );
 }
 
+function NotificationSettings() {
+  const { toast } = useToast();
+
+  const { data, isLoading } = useQuery<{ notification_mode: string; test_email: string; test_phone: string }>({
+    queryKey: ["/api/admin/system-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/system-settings", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load");
+      return res.json();
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (settings: { notification_mode: string; test_email: string; test_phone: string }) => {
+      return apiRequest("PATCH", "/api/admin/system-settings", settings);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/system-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/notification-mode"] });
+      toast({ title: "Settings saved", description: "Notification settings have been updated." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const currentMode = data?.notification_mode || "test";
+  const currentTestEmail = data?.test_email || "rossouw@hoolio.co.za";
+  const currentTestPhone = data?.test_phone || "0828224487";
+
+  const [localMode, setLocalMode] = useState<string | null>(null);
+  const [localEmail, setLocalEmail] = useState<string | null>(null);
+  const [localPhone, setLocalPhone] = useState<string | null>(null);
+
+  const displayMode = localMode ?? currentMode;
+  const displayEmail = localEmail ?? currentTestEmail;
+  const displayPhone = localPhone ?? currentTestPhone;
+
+  const handleSave = () => {
+    mutation.mutate({
+      notification_mode: displayMode,
+      test_email: displayEmail,
+      test_phone: displayPhone,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-32 rounded-xl" />
+        <Skeleton className="h-24 rounded-xl" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold flex items-center gap-2 mb-1">
+          <Bell className="w-5 h-5 text-primary" />
+          Notification Settings
+        </h2>
+        <p className="text-sm text-muted-foreground">Control how emails and SMS are sent from Koneksi</p>
+      </div>
+
+      <div className="glass-card rounded-xl p-6 space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm">Notification Mode</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {displayMode === "test"
+                ? "All notifications go to test address/number only"
+                : "Notifications go to real recipients"}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`text-xs font-medium ${displayMode === "test" ? "text-amber-600" : "text-muted-foreground"}`}>
+              Test
+            </span>
+            <button
+              data-testid="toggle-notification-mode"
+              onClick={() => setLocalMode(displayMode === "test" ? "production" : "test")}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                displayMode === "production" ? "bg-emerald-500" : "bg-amber-400"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  displayMode === "production" ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className={`text-xs font-medium ${displayMode === "production" ? "text-emerald-600" : "text-muted-foreground"}`}>
+              Production
+            </span>
+          </div>
+        </div>
+
+        {displayMode === "test" && (
+          <div className="space-y-4 pt-2 border-t border-border/40">
+            <p className="text-xs text-amber-600 font-medium flex items-center gap-1.5">
+              <FlaskConical className="w-3.5 h-3.5" />
+              In test mode, all notifications are redirected to the addresses below
+            </p>
+            <div>
+              <Label className="text-sm">Test Email Address</Label>
+              <Input
+                data-testid="input-test-email"
+                value={displayEmail}
+                onChange={(e) => setLocalEmail(e.target.value)}
+                placeholder="test@example.com"
+                className="rounded-xl mt-1.5"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Test Phone Number</Label>
+              <Input
+                data-testid="input-test-phone"
+                value={displayPhone}
+                onChange={(e) => setLocalPhone(e.target.value)}
+                placeholder="+27821234567"
+                className="rounded-xl mt-1.5"
+              />
+            </div>
+          </div>
+        )}
+
+        <Button
+          className="w-full rounded-xl gradient-teal text-white"
+          onClick={handleSave}
+          disabled={mutation.isPending}
+          data-testid="button-save-notification-settings"
+        >
+          {mutation.isPending ? "Saving..." : "Save Settings"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1270,6 +1412,10 @@ export default function AdminPage() {
           <TabsTrigger value="approvals" data-testid="tab-approvals" className="rounded-lg">
             <ClipboardCheck className="w-4 h-4 mr-2" />
             Approvals
+          </TabsTrigger>
+          <TabsTrigger value="notifications" data-testid="tab-notifications" className="rounded-lg">
+            <Bell className="w-4 h-4 mr-2" />
+            Notifications
           </TabsTrigger>
         </TabsList>
 
@@ -1467,6 +1613,10 @@ export default function AdminPage() {
             <p className="text-sm text-muted-foreground">Review and approve or reject supplier applications</p>
           </div>
           <PendingSuppliers />
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-4">
+          <NotificationSettings />
         </TabsContent>
       </Tabs>
 

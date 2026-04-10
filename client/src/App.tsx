@@ -31,6 +31,7 @@ import JoinEstatePage from "@/pages/join-estate";
 import MaintPage from "@/pages/maint";
 import PendingApprovalPage from "@/pages/pending-approval";
 import PendingEstateApprovalPage from "@/pages/pending-estate-approval";
+import JoinProviderPage from "@/pages/join-provider";
 import NotFound from "@/pages/not-found";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEstate } from "@/lib/estate-context";
@@ -157,6 +158,11 @@ function ResidentApp() {
 
 function AppContent() {
   const { user, isLoading } = useAuth();
+  const [location] = useLocation();
+
+  if (location.startsWith("/join-provider")) {
+    return <JoinProviderPage />;
+  }
 
   if (isLoading) {
     return (

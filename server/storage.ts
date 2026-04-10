@@ -12,9 +12,10 @@ import {
   type UserProperty, type InsertUserProperty,
   type ProviderInvitation, type InsertProviderInvitation,
   type MaintAnalysis, type InsertMaintAnalysis,
+  type SystemSetting,
   users, estates, userEstates, bills, outages, providers, reviews,
   subscriptionTiers, providerSubscriptions, providerVisibleEstates,
-  userProperties, providerInvitations, maintAnalyses,
+  userProperties, providerInvitations, maintAnalyses, systemSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or, inArray, sql } from "drizzle-orm";
@@ -83,6 +84,13 @@ export interface IStorage {
   getProviderInvitations(estateId: string): Promise<ProviderInvitation[]>;
   createProviderInvitation(data: InsertProviderInvitation): Promise<ProviderInvitation>;
   updateProviderInvitationStatus(id: string, status: string): Promise<ProviderInvitation>;
+  getProviderInvitationByToken(token: string): Promise<ProviderInvitation | undefined>;
+  updateProviderInvitation(id: string, data: { status?: string; claimedByUserId?: string | null; token?: string | null }): Promise<ProviderInvitation>;
+  getProviderInvitationByClaimant(userId: string, estateId: string): Promise<ProviderInvitation | undefined>;
+
+  getSystemSettings(): Promise<SystemSetting[]>;
+  getSystemSetting(key: string): Promise<string | null>;
+  setSystemSetting(key: string, value: string): Promise<void>;
 
   getMaintAnalyses(userId: string): Promise<MaintAnalysis[]>;
   createMaintAnalysis(data: InsertMaintAnalysis): Promise<MaintAnalysis>;
@@ -505,13 +513,43 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createProviderInvitation(data: InsertProviderInvitation): Promise<ProviderInvitation> {
-    const [created] = await db.insert(providerInvitations).values(data).returning();
+    const [created] = await db.insert(providerInvitations).values({ ...data, statusUpdatedAt: new Date() }).returning();
     return created;
   }
 
   async updateProviderInvitationStatus(id: string, status: string): Promise<ProviderInvitation> {
-    const [updated] = await db.update(providerInvitations).set({ status }).where(eq(providerInvitations.id, id)).returning();
+    const [updated] = await db.update(providerInvitations).set({ status, statusUpdatedAt: new Date() }).where(eq(providerInvitations.id, id)).returning();
     return updated;
+  }
+
+  async getProviderInvitationByToken(token: string): Promise<ProviderInvitation | undefined> {
+    const [inv] = await db.select().from(providerInvitations).where(eq(providerInvitations.token, token));
+    return inv;
+  }
+
+  async updateProviderInvitation(id: string, data: { status?: string; claimedByUserId?: string | null; token?: string | null }): Promise<ProviderInvitation> {
+    const [updated] = await db.update(providerInvitations).set({ ...data, statusUpdatedAt: new Date() }).where(eq(providerInvitations.id, id)).returning();
+    return updated;
+  }
+
+  async getProviderInvitationByClaimant(userId: string, estateId: string): Promise<ProviderInvitation | undefined> {
+    const [inv] = await db.select().from(providerInvitations).where(
+      and(eq(providerInvitations.claimedByUserId, userId), eq(providerInvitations.estateId, estateId))
+    );
+    return inv;
+  }
+
+  async getSystemSettings(): Promise<SystemSetting[]> {
+    return db.select().from(systemSettings);
+  }
+
+  async getSystemSetting(key: string): Promise<string | null> {
+    const [row] = await db.select().from(systemSettings).where(eq(systemSettings.key, key));
+    return row?.value ?? null;
+  }
+
+  async setSystemSetting(key: string, value: string): Promise<void> {
+    await db.insert(systemSettings).values({ key, value }).onConflictDoUpdate({ target: systemSettings.key, set: { value } });
   }
 
   async getMaintAnalyses(userId: string): Promise<MaintAnalysis[]> {

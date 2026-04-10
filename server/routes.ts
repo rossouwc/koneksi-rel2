@@ -3,7 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual, randomUUID } from "crypto";
 import { promisify } from "util";
 import connectPgSimple from "connect-pg-simple";
 import multer from "multer";
@@ -13,6 +13,7 @@ import { analyzeBillImage } from "./openai-bill-analyzer";
 import { analyzeMaintenancePhoto } from "./openai-maint-analyzer";
 import { buildPayFastUrl, validatePayFastITN } from "./payfast";
 import { searchAreas, getAreaInfo, getStatus as getEspStatus } from "./eskomsepush";
+import { sendEmail, sendSms } from "./notifications";
 import { db } from "./db";
 import { users, estates, userEstates, bills, outages, providers, reviews, providerVisibleEstates } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
@@ -885,6 +886,14 @@ export async function registerRoutes(
       const isMember = await verifyEstateMembership(userId, estateId);
       if (!isMember) return res.status(403).json({ message: "Not a member of this estate" });
 
+      const appUrl = process.env.APP_URL ||
+        (req.headers["x-forwarded-proto"] && req.headers["x-forwarded-host"]
+          ? `${req.headers["x-forwarded-proto"]}://${req.headers["x-forwarded-host"]}`
+          : `${req.protocol}://${req.get("host")}`);
+
+      const token = randomUUID();
+      const inviteUrl = `${appUrl}/join-provider?token=${token}`;
+
       const invitation = await storage.createProviderInvitation({
         estateId,
         invitedByUserId: userId,
@@ -892,8 +901,40 @@ export async function registerRoutes(
         providerEmail: providerEmail || null,
         providerPhone: providerPhone || null,
         category: category || null,
+        token,
       });
-      res.json(invitation);
+
+      const inviter = await storage.getUser(userId);
+      const estate = await storage.getEstate(estateId);
+
+      const emailBody = `Hi ${providerName},\n\nYou've been invited by ${inviter?.fullName || "a resident"} to join Koneksi as a provider for ${estate?.name || "an estate"}.\n\nClick the link below to register:\n${inviteUrl}\n\nCategory: ${category || "General"}\n\nKoneksi Team`;
+      const smsBody = `Koneksi: ${inviter?.fullName || "A resident"} has invited you to join ${estate?.name || "an estate"} as a provider. Register here: ${inviteUrl}`;
+
+      let notified = false;
+      if (providerEmail) {
+        sendEmail(providerEmail, `You've been invited to join ${estate?.name || "an estate"} on Koneksi`, emailBody).catch(() => {});
+        notified = true;
+      }
+      if (providerPhone) {
+        sendSms(providerPhone, smsBody).catch(() => {});
+        notified = true;
+      }
+
+      const finalInvitation = notified
+        ? await storage.updateProviderInvitationStatus(invitation.id, "sent")
+        : invitation;
+
+      const estateAdmins = await storage.getEstateResidents(estateId);
+      const admins = estateAdmins.filter((r) => r.role === "estate_admin");
+      for (const admin of admins) {
+        sendEmail(
+          admin.user.email,
+          `New provider invitation sent for ${estate?.name || "your estate"}`,
+          `Hi ${admin.user.fullName},\n\nA new provider invitation was sent to ${providerName} (${category || "General"}) for ${estate?.name}.\n\nInvited by: ${inviter?.fullName || "a resident"}\n\nKoneksi Team`
+        ).catch(() => {});
+      }
+
+      res.json(finalInvitation);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -929,6 +970,29 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Pending provider not found in this estate" });
       }
       const updated = await storage.approveProvider(providerId);
+      const estate = await storage.getEstate(estateId);
+
+      if (provider.email) {
+        sendEmail(
+          provider.email,
+          `You've been approved for ${estate?.name || "an estate"} on Koneksi`,
+          `Hi ${provider.name},\n\nGreat news! You've been approved as a provider for ${estate?.name || "an estate"} on Koneksi.\n\nYou can now log in and start receiving service requests.\n\nKoneksi Team`
+        ).catch(() => {});
+      }
+      if (provider.phone) {
+        sendSms(
+          provider.phone,
+          `Koneksi: You've been approved as a provider for ${estate?.name || "an estate"}! Log in to get started.`
+        ).catch(() => {});
+      }
+
+      if (provider.createdBy) {
+        const matchingInv = await storage.getProviderInvitationByClaimant(provider.createdBy, estateId);
+        if (matchingInv && matchingInv.status === "registered") {
+          await storage.updateProviderInvitationStatus(matchingInv.id, "approved");
+        }
+      }
+
       res.json(updated);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -946,7 +1010,30 @@ export async function registerRoutes(
       if (!provider || provider.estateId !== estateId || provider.providerApprovalStatus !== "pending") {
         return res.status(404).json({ message: "Pending provider not found in this estate" });
       }
+      const estate = await storage.getEstate(estateId);
       await storage.rejectProvider(providerId);
+
+      if (provider.email) {
+        sendEmail(
+          provider.email,
+          `Update on your provider application for ${estate?.name || "an estate"}`,
+          `Hi ${provider.name},\n\nThank you for your interest in joining ${estate?.name || "an estate"} on Koneksi. After careful consideration, the estate admin has decided not to proceed with your application at this time.\n\nWe appreciate your interest and encourage you to explore other opportunities on Koneksi.\n\nKoneksi Team`
+        ).catch(() => {});
+      }
+      if (provider.phone) {
+        sendSms(
+          provider.phone,
+          `Koneksi: Your provider application for ${estate?.name || "an estate"} was not approved at this time. Thank you for your interest.`
+        ).catch(() => {});
+      }
+
+      if (provider.createdBy) {
+        const matchingInv = await storage.getProviderInvitationByClaimant(provider.createdBy, estateId);
+        if (matchingInv && matchingInv.status === "registered") {
+          await storage.updateProviderInvitationStatus(matchingInv.id, "rejected");
+        }
+      }
+
       res.json({ message: "Provider rejected" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1704,6 +1791,145 @@ export async function registerRoutes(
       }
       const updated = await storage.updateUserProperty(propertyId, { espAreaId: espAreaId || null, espAreaName: espAreaName || null });
       res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/providers/invite/:token", async (req, res) => {
+    try {
+      const inv = await storage.getProviderInvitationByToken(req.params.token);
+      if (!inv) return res.status(404).json({ message: "Invitation not found or expired" });
+      const estate = await storage.getEstate(inv.estateId);
+      const inviter = await storage.getUser(inv.invitedByUserId);
+      res.json({
+        ...inv,
+        estateName: estate?.name || null,
+        inviterName: inviter?.fullName || null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/providers/claim-invite", async (req, res) => {
+    try {
+      const { token, fullName, email, phone, password, services } = req.body;
+      if (!token || !fullName || !email || !password) {
+        return res.status(400).json({ message: "token, fullName, email, password are required" });
+      }
+
+      const inv = await storage.getProviderInvitationByToken(token);
+      if (!inv) return res.status(404).json({ message: "Invitation not found" });
+      if (inv.status === "registered" || inv.status === "approved" || inv.status === "rejected") {
+        return res.status(400).json({ message: "This invitation has already been used" });
+      }
+
+      const existing = await storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(400).json({ message: "An account with this email already exists. Please use a different email or sign in to your existing account." });
+      }
+      const hashedPw = await hashPassword(password);
+      const [newUser] = await db.insert(users).values({
+        email,
+        password: hashedPw,
+        fullName,
+        phone: phone || null,
+        role: "supplier" as const,
+        profileComplete: true,
+        businessName: fullName,
+        services: services || [],
+        approvalStatus: "pending",
+      }).returning();
+
+      const estate = await storage.getEstate(inv.estateId);
+      const provider = await storage.createProvider({
+        estateId: inv.estateId,
+        createdBy: newUser.id,
+        name: fullName,
+        category: inv.category || "General",
+        phone: phone || null,
+        whatsapp: null,
+        email,
+        website: null,
+        description: null,
+        services: services || [],
+        providerApprovalStatus: "pending",
+        recommendedBy: inv.invitedByUserId,
+      });
+
+      await storage.updateProviderInvitation(inv.id, {
+        status: "registered",
+        claimedByUserId: newUser.id,
+      });
+
+      const estateAdmins = await storage.getEstateResidents(inv.estateId);
+      const admins = estateAdmins.filter((r) => r.role === "estate_admin");
+      for (const admin of admins) {
+        sendEmail(
+          admin.user.email,
+          `${fullName} has registered via your invitation`,
+          `Hi ${admin.user.fullName},\n\n${fullName} has registered on Koneksi as a provider for ${estate?.name || "your estate"} via an invitation and is awaiting your approval.\n\nPlease log in to review and approve or reject their application.\n\nKoneksi Team`
+        ).catch(() => {});
+      }
+
+      res.json({ message: "Registration successful. Your application is pending approval.", provider });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/admin/system-settings", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.isSuperAdmin && user?.role !== "super_admin") return res.status(403).json({ message: "Super admin only" });
+      const settings = await storage.getSystemSettings();
+      const map: Record<string, string> = {};
+      for (const s of settings) map[s.key] = s.value;
+      res.json({
+        notification_mode: map["notification_mode"] || "test",
+        test_email: map["test_email"] || "rossouw@hoolio.co.za",
+        test_phone: map["test_phone"] || "0828224487",
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/admin/system-settings", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.isSuperAdmin && user?.role !== "super_admin") return res.status(403).json({ message: "Super admin only" });
+      const { notification_mode, test_email, test_phone } = req.body;
+      if (notification_mode !== undefined) {
+        if (notification_mode !== "test" && notification_mode !== "production") {
+          return res.status(400).json({ message: "notification_mode must be 'test' or 'production'" });
+        }
+        await storage.setSystemSetting("notification_mode", notification_mode);
+      }
+      if (test_email) await storage.setSystemSetting("test_email", test_email);
+      if (test_phone) await storage.setSystemSetting("test_phone", test_phone);
+      const settings = await storage.getSystemSettings();
+      const map: Record<string, string> = {};
+      for (const s of settings) map[s.key] = s.value;
+      res.json({
+        notification_mode: map["notification_mode"] || "test",
+        test_email: map["test_email"] || "rossouw@hoolio.co.za",
+        test_phone: map["test_phone"] || "0828224487",
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/admin/notification-mode", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.isSuperAdmin && user?.role !== "estate_admin") {
+        return res.status(403).json({ message: "Admins only" });
+      }
+      const mode = await storage.getSystemSetting("notification_mode");
+      res.json({ mode: mode || "test" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { useEstate } from "@/lib/estate-context";
 import { useTheme } from "@/lib/theme";
 import { usePortal } from "@/lib/portal-context";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Store,
@@ -19,6 +20,7 @@ import {
   UserCircle,
   Briefcase,
   Home,
+  FlaskConical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -141,11 +143,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const isAdmin = user?.isSuperAdmin || user?.role === "super_admin";
+  const isEstateAdmin = user?.role === "estate_admin";
+
+  const { data: notificationModeData } = useQuery<{ mode: string }>({
+    queryKey: ["/api/admin/notification-mode"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/notification-mode", { credentials: "include" });
+      if (!res.ok) return { mode: "test" };
+      return res.json();
+    },
+    enabled: !!(isAdmin || isEstateAdmin),
+    staleTime: 60000,
+  });
+
+  const isTestMode = notificationModeData?.mode === "test" || !notificationModeData;
 
   const allNavItems = navItems;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {(isAdmin || isEstateAdmin) && isTestMode && (
+        <div className="bg-amber-400 dark:bg-amber-500 text-amber-900 dark:text-amber-950 px-4 py-1.5 text-xs font-medium flex items-center justify-center gap-2" data-testid="banner-test-mode">
+          <FlaskConical className="w-3.5 h-3.5" />
+          Test Mode Active — All notifications are redirected to test addresses
+        </div>
+      )}
       <header className="sticky top-0 z-50 border-b border-border/40">
         <div
           className="px-4 md:px-6"

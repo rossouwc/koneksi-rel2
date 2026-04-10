@@ -112,6 +112,24 @@ export const providerInvitations = pgTable("provider_invitations", {
   providerPhone: text("provider_phone"),
   category: text("category"),
   status: text("status").default("pending"),
+  token: varchar("token").unique(),
+  statusUpdatedAt: timestamp("status_updated_at"),
+  claimedByUserId: varchar("claimed_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const systemSettings = pgTable("system_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
+export const notificationLog = pgTable("notification_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(),
+  recipient: text("recipient").notNull(),
+  subject: text("subject"),
+  body: text("body"),
+  status: text("status").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -205,6 +223,7 @@ export const insertProviderVisibleEstateSchema = createInsertSchema(providerVisi
 export const insertUserPropertySchema = createInsertSchema(userProperties).omit({ id: true, createdAt: true });
 export const insertProviderInvitationSchema = createInsertSchema(providerInvitations).omit({ id: true, createdAt: true, status: true });
 export const insertMaintAnalysisSchema = createInsertSchema(maintAnalyses).omit({ id: true, createdAt: true });
+export const insertNotificationLogSchema = createInsertSchema(notificationLog).omit({ id: true, createdAt: true });
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -270,3 +289,6 @@ export type ProviderInvitation = typeof providerInvitations.$inferSelect;
 export type InsertProviderInvitation = z.infer<typeof insertProviderInvitationSchema>;
 export type MaintAnalysis = typeof maintAnalyses.$inferSelect;
 export type InsertMaintAnalysis = z.infer<typeof insertMaintAnalysisSchema>;
+export type NotificationLog = typeof notificationLog.$inferSelect;
+export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+export type SystemSetting = typeof systemSettings.$inferSelect;
