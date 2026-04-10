@@ -655,47 +655,53 @@ function ProviderCard({
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4, scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className={`provider-card rounded-2xl p-5 cursor-pointer transition-all duration-300 relative overflow-hidden ${
-        isPremium ? "provider-card-premium" : ""
-      }`}
+      className={`provider-card rounded-2xl cursor-pointer overflow-hidden ${isPremium ? "provider-card-premium" : ""}`}
       data-testid={`card-provider-${provider.id}`}
     >
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-500 rounded-t-2xl opacity-80" />
-      {isPremium && (
-        <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-primary/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 blur-xl" />
-      )}
-      <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-teal-500/5 to-transparent rounded-full translate-y-1/2 -translate-x-1/2 blur-lg" />
-      <div className="relative">
-        <div className="flex items-start gap-3.5 mb-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-50 to-emerald-100 dark:from-teal-900/40 dark:to-emerald-900/30 flex items-center justify-center text-lg flex-shrink-0 shadow-sm ring-1 ring-teal-200/50 dark:ring-teal-700/30">
+      <div className="relative h-[72px] bg-gradient-to-br from-teal-500/20 via-emerald-400/10 to-transparent">
+        <div className="absolute bottom-0 left-5 translate-y-1/2">
+          <div className="w-[54px] h-[54px] rounded-2xl gradient-teal flex items-center justify-center text-2xl shadow-md ring-2 ring-white dark:ring-zinc-900">
             {icon}
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm truncate" data-testid={`text-name-${provider.id}`}>
-                {provider.name}
-              </h3>
-              {isPremium && (
-                <Badge variant="outline" className={`text-[9px] px-1.5 py-0 rounded-full border ${badgeColor} flex-shrink-0`}>
-                  <Crown className="w-2 h-2 mr-0.5" />
-                  {tierName}
-                </Badge>
-              )}
-            </div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize inline-block mt-0.5">
-              {provider.category}
-            </span>
+        </div>
+        {isPremium && (
+          <div className="absolute top-2.5 right-3">
+            <Badge
+              variant="outline"
+              className={`text-[9px] px-1.5 py-0.5 rounded-full border ${badgeColor} bg-white/90 dark:bg-zinc-900/90`}
+            >
+              <Crown className="w-2 h-2 mr-0.5" />
+              {tierName}
+            </Badge>
           </div>
+        )}
+      </div>
+
+      <div className="pt-8 px-5 pb-4">
+        <div className="mb-2.5">
+          <h3 className="font-bold text-[15px] leading-snug truncate" data-testid={`text-name-${provider.id}`}>
+            {provider.name}
+          </h3>
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary capitalize font-medium inline-block mt-1">
+            {provider.category}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2 mb-2">
-          <StarRating rating={Math.round(avgRating)} />
-          <span className="text-xs text-muted-foreground">
-            {avgRating > 0 ? `${avgRating.toFixed(1)} (${reviews.length})` : "No reviews"}
-          </span>
+        <div className="flex items-center gap-1.5 mb-3">
+          <StarRating rating={Math.round(avgRating)} size="sm" />
+          {avgRating > 0 ? (
+            <>
+              <span className="text-xs font-semibold">{avgRating.toFixed(1)}</span>
+              <span className="text-xs text-muted-foreground">
+                · {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">No reviews yet</span>
+          )}
         </div>
 
         {provider.services && provider.services.length > 0 && (
@@ -710,63 +716,76 @@ function ProviderCard({
           </p>
         )}
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {provider.phone && (
+        <div className="border-t border-border/40 pt-3 flex items-center gap-2">
+          {provider.phone ? (
             <a
               href={`tel:${provider.phone}`}
               onClick={(e) => e.stopPropagation()}
+              className="flex-1"
               data-testid={`link-call-${provider.id}`}
             >
-              <Button variant="outline" size="sm" className="rounded-lg h-7 text-[10px] gap-1 px-2">
-                <Phone className="w-3 h-3" />
+              <Button className="w-full rounded-xl h-9 text-sm gradient-teal text-white gap-2">
+                <Phone className="w-3.5 h-3.5" />
                 Call
               </Button>
             </a>
-          )}
-          {(provider as any).whatsapp && (
-            <a
-              href={`https://wa.me/${(provider as any).whatsapp.replace(/\D/g, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              data-testid={`link-whatsapp-${provider.id}`}
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-lg h-7 text-[10px] gap-1 px-2 text-green-600 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/20"
-              >
-                <SiWhatsapp className="w-3 h-3" />
-                WhatsApp
-              </Button>
-            </a>
-          )}
-          {provider.email && (
+          ) : provider.email ? (
             <a
               href={`mailto:${provider.email}`}
               onClick={(e) => e.stopPropagation()}
+              className="flex-1"
               data-testid={`link-email-${provider.id}`}
             >
-              <Button variant="outline" size="sm" className="rounded-lg h-7 text-[10px] gap-1 px-2">
-                <Mail className="w-3 h-3" />
+              <Button className="w-full rounded-xl h-9 text-sm gradient-teal text-white gap-2">
+                <Mail className="w-3.5 h-3.5" />
                 Email
               </Button>
             </a>
-          )}
-          {provider.website && (
-            <a
-              href={provider.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              data-testid={`link-website-${provider.id}`}
-            >
-              <Button variant="outline" size="sm" className="rounded-lg h-7 text-[10px] gap-1 px-2">
-                <Globe className="w-3 h-3" />
-                Website
-              </Button>
-            </a>
-          )}
+          ) : null}
+
+          <div className="flex items-center gap-1.5">
+            {(provider as any).whatsapp && (
+              <a
+                href={`https://wa.me/${(provider as any).whatsapp.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                data-testid={`link-whatsapp-${provider.id}`}
+              >
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-xl h-9 w-9 border-green-200 text-green-600 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20 flex-shrink-0"
+                >
+                  <SiWhatsapp className="w-4 h-4" />
+                </Button>
+              </a>
+            )}
+            {provider.email && provider.phone && (
+              <a
+                href={`mailto:${provider.email}`}
+                onClick={(e) => e.stopPropagation()}
+                data-testid={`link-email-${provider.id}`}
+              >
+                <Button variant="outline" size="icon" className="rounded-xl h-9 w-9 flex-shrink-0">
+                  <Mail className="w-4 h-4" />
+                </Button>
+              </a>
+            )}
+            {provider.website && (
+              <a
+                href={provider.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                data-testid={`link-website-${provider.id}`}
+              >
+                <Button variant="outline" size="icon" className="rounded-xl h-9 w-9 flex-shrink-0">
+                  <Globe className="w-3.5 h-3.5" />
+                </Button>
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>
