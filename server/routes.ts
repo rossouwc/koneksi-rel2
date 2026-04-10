@@ -2023,14 +2023,17 @@ export async function registerRoutes(
     return myProviders[0].id;
   }
 
-  app.post("/api/marketplace/upload-image", requireAuth, upload.single("image"), async (req, res) => {
-    try {
-      if (!req.file) return res.status(400).json({ message: "No image file provided" });
+  app.post("/api/marketplace/upload-image", requireAuth, (req, res, next) => {
+    upload.single("image")(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ message: err.message || "File upload error" });
+      }
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided or unsupported file type" });
+      }
       const url = `/uploads/${req.file.filename}`;
-      res.json({ url });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
+      return res.json({ url });
+    });
   });
 
   app.get("/api/marketplace/my-listings", requireAuth, async (req, res) => {
