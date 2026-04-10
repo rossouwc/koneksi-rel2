@@ -50,7 +50,7 @@ function CompanyAvatar({ logoUrl, businessName, size = "lg" }: { logoUrl: string
 
   if (logoUrl) {
     return (
-      <div className={`${sizeClasses[size]} overflow-hidden flex-shrink-0 bg-muted ring-2 ring-border`}>
+      <div className={`${sizeClasses[size]} overflow-hidden flex-shrink-0 bg-white dark:bg-zinc-800 ring-1 ring-border`}>
         <img src={logoUrl} alt={businessName || "Company"} className="w-full h-full object-contain" />
       </div>
     );

@@ -252,7 +252,7 @@ function ProviderDetail({
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-xl" />
         <div className="relative">
           <div className="flex items-start gap-4 mb-4">
-            <div className="w-14 h-14 rounded-2xl gradient-teal-subtle flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden bg-white dark:bg-zinc-900">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden ${(provider as any).logoUrl ? "bg-white dark:bg-zinc-800 ring-1 ring-border" : "gradient-teal-subtle"}`}>
               {(provider as any).logoUrl ? (
                 <img src={(provider as any).logoUrl} alt={provider.name} className="w-full h-full object-contain p-1.5" />
               ) : (
@@ -667,7 +667,7 @@ function ProviderCard({
     >
       <div className="relative h-[72px] bg-gradient-to-br from-teal-500/20 via-emerald-400/10 to-transparent">
         <div className="absolute bottom-0 left-5 translate-y-1/2">
-          <div className="w-[54px] h-[54px] rounded-2xl gradient-teal flex items-center justify-center text-2xl shadow-md ring-2 ring-white dark:ring-zinc-900 overflow-hidden bg-white dark:bg-zinc-900">
+          <div className={`w-[54px] h-[54px] rounded-2xl flex items-center justify-center text-2xl shadow-md ring-2 ring-white dark:ring-zinc-900 overflow-hidden ${(provider as any).logoUrl ? "bg-white dark:bg-zinc-800" : "gradient-teal"}`}>
             {(provider as any).logoUrl ? (
               <img src={(provider as any).logoUrl} alt={provider.name} className="w-full h-full object-contain p-1" />
             ) : (

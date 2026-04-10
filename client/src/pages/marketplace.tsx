@@ -130,7 +130,7 @@ function ListingCard({ listing, index }: { listing: ListingItem; index: number }
           </div>
 
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-6 h-6 rounded-md overflow-hidden bg-gradient-to-br from-teal-600/20 to-emerald-700/20 flex-shrink-0 flex items-center justify-center">
+            <div className={`w-6 h-6 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center ${listing.providerLogoUrl ? "bg-white dark:bg-zinc-800 ring-1 ring-border" : "bg-gradient-to-br from-teal-600/20 to-emerald-700/20"}`}>
               {listing.providerLogoUrl ? (
                 <img src={listing.providerLogoUrl} alt={listing.providerName} className="w-full h-full object-contain" />
               ) : (

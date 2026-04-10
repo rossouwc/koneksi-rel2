@@ -55,7 +55,7 @@ function SupplierAvatarDropdown() {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 rounded-full hover:opacity-90 transition-opacity"
       >
-        <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-teal-600 to-emerald-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+        <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${logoUrl ? "bg-white dark:bg-zinc-800 ring-1 ring-border" : "bg-gradient-to-br from-teal-600 to-emerald-700"}`}>
           {logoUrl ? (
             <img src={logoUrl} alt={user?.businessName || user?.fullName || ""} className="w-full h-full object-contain" />
           ) : (
