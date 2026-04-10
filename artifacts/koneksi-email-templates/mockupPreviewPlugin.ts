@@ -134,15 +134,16 @@ export function mockupPreviewPlugin(): Plugin {
     req.pipe(proxyReq, { end: true });
   }
 
-  // Check if a path belongs to the preview server's own Vite assets
-  // (i.e. references this repo's artifact directory)
+  // Check if a path must be served by THIS Vite server (port 20961).
+  // Only the HMR client WebSocket endpoint and files physically inside the
+  // artifacts directory stay here. Everything else — including @react-refresh
+  // and all deps — is proxied to the main app on port 5000 so that only one
+  // copy of React exists in the browser.
   function isPreviewServerAsset(pathname: string): boolean {
-    // Vite internal dev utilities (same for any Vite server)
+    // The HMR WebSocket lives here; must NOT be proxied
     if (pathname === "/@vite/client") return true;
-    if (pathname.startsWith("/@vite/env")) return true;
-    if (pathname.startsWith("/@react-refresh")) return true;
     if (pathname === "/__dummy__runtime-error-plugin") return true;
-    // Files physically inside the artifacts directory
+    // Files physically inside the artifacts directory (email template components)
     if (pathname.includes("/artifacts/koneksi-email-templates/")) return true;
     // The preview server's own generated module
     if (pathname.includes("/.generated/mockup-components")) return true;
