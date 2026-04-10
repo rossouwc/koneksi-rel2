@@ -26,6 +26,7 @@ import SupplierCalendarPage from "@/pages/supplier-calendar";
 import SupplierBookingsPage from "@/pages/supplier-bookings";
 import SupplierAnalyticsPage from "@/pages/supplier-analytics";
 import SupplierBillingPage from "@/pages/supplier-billing";
+import SupplierMarketplacePage from "@/pages/supplier-marketplace";
 import MarketplacePage from "@/pages/marketplace";
 import JoinEstatePage from "@/pages/join-estate";
 import MaintPage from "@/pages/maint";
@@ -51,6 +52,7 @@ function SupplierRoutes() {
         <Route path="/supplier/profile" component={SupplierProfilePage} />
         <Route path="/supplier/calendar" component={SupplierCalendarPage} />
         <Route path="/supplier/bookings" component={SupplierBookingsPage} />
+        <Route path="/supplier/marketplace" component={SupplierMarketplacePage} />
         <Route path="/supplier/analytics" component={SupplierAnalyticsPage} />
         <Route path="/supplier/billing" component={SupplierBillingPage} />
         <Route component={SupplierRedirect} />

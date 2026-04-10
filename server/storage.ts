@@ -13,9 +13,11 @@ import {
   type ProviderInvitation, type InsertProviderInvitation,
   type MaintAnalysis, type InsertMaintAnalysis,
   type SystemSetting,
+  type MarketplaceListing, type InsertMarketplaceListing,
   users, estates, userEstates, bills, outages, providers, reviews,
   subscriptionTiers, providerSubscriptions, providerVisibleEstates,
   userProperties, providerInvitations, maintAnalyses, systemSettings,
+  marketplaceListings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or, inArray, sql } from "drizzle-orm";
@@ -95,6 +97,12 @@ export interface IStorage {
   getMaintAnalyses(userId: string): Promise<MaintAnalysis[]>;
   createMaintAnalysis(data: InsertMaintAnalysis): Promise<MaintAnalysis>;
   deleteMaintAnalysis(id: string, userId: string): Promise<void>;
+
+  createMarketplaceListing(data: InsertMarketplaceListing): Promise<MarketplaceListing>;
+  getMyMarketplaceListings(providerId: string): Promise<MarketplaceListing[]>;
+  updateMarketplaceListing(id: string, providerId: string, data: Partial<InsertMarketplaceListing>): Promise<MarketplaceListing>;
+  deleteMarketplaceListing(id: string, providerId: string): Promise<boolean>;
+  getEstateMarketplaceListings(estateIds: string[]): Promise<(MarketplaceListing & { providerName: string; providerCategory: string; providerPhone: string | null; providerWhatsapp: string | null; providerEmail: string | null; providerWebsite: string | null })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -569,6 +577,79 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(maintAnalyses)
       .where(and(eq(maintAnalyses.id, id), eq(maintAnalyses.userId, userId)));
+  }
+
+  async createMarketplaceListing(data: InsertMarketplaceListing): Promise<MarketplaceListing> {
+    const [created] = await db.insert(marketplaceListings).values(data).returning();
+    return created;
+  }
+
+  async getMyMarketplaceListings(providerId: string): Promise<MarketplaceListing[]> {
+    return db.select().from(marketplaceListings)
+      .where(eq(marketplaceListings.providerId, providerId))
+      .orderBy(desc(marketplaceListings.createdAt));
+  }
+
+  async updateMarketplaceListing(id: string, providerId: string, data: Partial<InsertMarketplaceListing>): Promise<MarketplaceListing> {
+    const [updated] = await db.update(marketplaceListings)
+      .set(data)
+      .where(and(eq(marketplaceListings.id, id), eq(marketplaceListings.providerId, providerId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteMarketplaceListing(id: string, providerId: string): Promise<boolean> {
+    const rows = await db.delete(marketplaceListings)
+      .where(and(eq(marketplaceListings.id, id), eq(marketplaceListings.providerId, providerId)))
+      .returning({ id: marketplaceListings.id });
+    return rows.length > 0;
+  }
+
+  async getEstateMarketplaceListings(estateIds: string[]): Promise<(MarketplaceListing & { providerName: string; providerCategory: string; providerPhone: string | null; providerWhatsapp: string | null; providerEmail: string | null; providerWebsite: string | null })[]> {
+    if (estateIds.length === 0) return [];
+
+    const visibleLinks = await db.select().from(providerVisibleEstates)
+      .where(inArray(providerVisibleEstates.estateId, estateIds));
+    const linkedProviderIdsUnfiltered = visibleLinks.map((v) => v.providerId);
+
+    let linkedProviderIds: string[] = [];
+    if (linkedProviderIdsUnfiltered.length > 0) {
+      const approvedLinked = await db.select({ id: providers.id }).from(providers)
+        .where(and(inArray(providers.id, linkedProviderIdsUnfiltered), eq(providers.providerApprovalStatus, "approved")));
+      linkedProviderIds = approvedLinked.map((p) => p.id);
+    }
+
+    const directProviders = await db.select().from(providers)
+      .where(and(inArray(providers.estateId, estateIds), eq(providers.providerApprovalStatus, "approved")));
+    const directProviderIds = directProviders.map((p) => p.id);
+
+    const combined = [...linkedProviderIds, ...directProviderIds];
+    const allProviderIds = combined.filter((id, idx) => combined.indexOf(id) === idx);
+    if (allProviderIds.length === 0) return [];
+
+    const listings = await db.select().from(marketplaceListings)
+      .where(and(
+        inArray(marketplaceListings.providerId, allProviderIds),
+        eq(marketplaceListings.isActive, true)
+      ))
+      .orderBy(desc(marketplaceListings.createdAt));
+
+    const providerMap = new Map<string, Provider>();
+    const allProviderRows = await db.select().from(providers).where(inArray(providers.id, allProviderIds));
+    for (const p of allProviderRows) providerMap.set(p.id, p);
+
+    return listings.map((listing) => {
+      const provider = providerMap.get(listing.providerId);
+      return {
+        ...listing,
+        providerName: provider?.name ?? "Unknown",
+        providerCategory: provider?.category ?? "",
+        providerPhone: provider?.phone ?? null,
+        providerWhatsapp: provider?.whatsapp ?? null,
+        providerEmail: provider?.email ?? null,
+        providerWebsite: provider?.website ?? null,
+      };
+    });
   }
 }
 

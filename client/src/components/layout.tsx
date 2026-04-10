@@ -21,6 +21,7 @@ import {
   Briefcase,
   Home,
   FlaskConical,
+  ShoppingBag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,7 @@ const PROPERTY_PREFIX = "prop_";
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/providers", label: "Providers", icon: Store },
+  { path: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { path: "/join-estate", label: "Estates", icon: Building2 },
 ];
 

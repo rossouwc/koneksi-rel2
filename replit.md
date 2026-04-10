@@ -66,6 +66,7 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - **subscriptionTiers** - id, name, monthlyPrice (cents), maxEstates, scopeType (estate/city/province/national), description, sortOrder
 - **providerSubscriptions** - id, providerId, tierId, status (active/paused/canceled/free), selectedCity, selectedProvince, payfastToken, startedAt, nextBillingDate
 - **providerVisibleEstates** - id, providerId, estateId (junction for Free/Local tier estate visibility)
+- **marketplaceListings** - id, providerId (FK providers), title, description, listingType (promotion/service/product/combo/announcement), imageUrl, price (cents nullable), originalPrice (cents nullable), validFrom (nullable), validUntil (nullable), ctaType (call/whatsapp/email/website), isActive, createdAt
 
 ## Pages
 - Auth page (login/register) with Google OAuth button (placeholder), password reset link, glassmorphic forms
@@ -81,6 +82,8 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `/supplier/bookings` - Bookings & inquiries tracker (pending/confirmed/completed stats)
 - `/supplier/analytics` - Analytics dashboard (profile views, clicks, inquiries, charts)
 - `/supplier/billing` - Subscription & billing: current plan display, 5-tier pricing cards, upgrade/downgrade buttons
+- `/supplier/marketplace` - Supplier listing manager: create/edit/delete/toggle listings with type badge, pricing, expiry, CTA type, image URL
+- `/marketplace` - Resident marketplace feed: live listings from suppliers active in user's estates, search + type filters, expiry chips, CTA buttons (call/WhatsApp/email/website)
 - `/admin` - Super admin portal with DataTable views, estate detail sub-view, create/edit dialogs, supplier approvals tab (requires super_admin role)
 
 ## Hidden pages (routes kept in code, removed from navigation)
@@ -88,7 +91,6 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - `/outages` - Outage reporting + EskomSePush (hidden, not linked from nav)
 - `/alerts` - Outage alerts with map (hidden, not linked from nav)
 - `/bill-analyzer` - AI bill analysis (hidden, not linked from nav)
-- `/marketplace` - Product marketplace (hidden, not linked from nav)
 
 ## Key UI Features
 - Estate selector dropdown with "Personal" + estates + "+" button to join/manage estates
@@ -163,3 +165,8 @@ Koneksi is a mobile-first Progressive Web App for estate management. It features
 - PATCH /api/admin/estates/:id/approve - Approve pending estate (admin only)
 - PATCH /api/admin/estates/:id/reject - Reject pending estate (admin only)
 - GET /api/admin/estates/:id/residents - List estate residents with roles and join dates
+- GET /api/marketplace/my-listings - Supplier's own listings (supplier role only)
+- POST /api/marketplace/listings - Create marketplace listing (supplier role only)
+- PATCH /api/marketplace/listings/:id - Update listing (must own it, supplier role only)
+- DELETE /api/marketplace/listings/:id - Delete listing (must own it, supplier role only)
+- GET /api/marketplace/listings - Estate-scoped live feed (residents + estate admins; returns active listings from providers visible in user's estates)

@@ -60,6 +60,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const { runMigrations } = await import("./migrate");
+  await runMigrations().catch((e) => {
+    console.error("Migration failed, cannot start server:", e);
+    process.exit(1);
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const { seedDatabase } = await import("./seed");
     await seedDatabase().catch((e) => console.error("Seed error:", e));

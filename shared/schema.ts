@@ -210,6 +210,22 @@ export const maintAnalyses = pgTable("maint_analyses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const marketplaceListings = pgTable("marketplace_listings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").notNull().references(() => providers.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  listingType: text("listing_type").notNull().default("promotion"),
+  imageUrl: text("image_url"),
+  price: integer("price"),
+  originalPrice: integer("original_price"),
+  validFrom: timestamp("valid_from"),
+  validUntil: timestamp("valid_until"),
+  ctaType: text("cta_type").notNull().default("call"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, isSuperAdmin: true, profileComplete: true, role: true, approvalStatus: true });
 export const insertEstateSchema = createInsertSchema(estates).omit({ id: true, createdAt: true, inviteCode: true });
 export const insertUserEstateSchema = createInsertSchema(userEstates).omit({ id: true, joinedAt: true });
@@ -224,6 +240,7 @@ export const insertUserPropertySchema = createInsertSchema(userProperties).omit(
 export const insertProviderInvitationSchema = createInsertSchema(providerInvitations).omit({ id: true, createdAt: true, status: true });
 export const insertMaintAnalysisSchema = createInsertSchema(maintAnalyses).omit({ id: true, createdAt: true });
 export const insertNotificationLogSchema = createInsertSchema(notificationLog).omit({ id: true, createdAt: true });
+export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings).omit({ id: true, createdAt: true });
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -292,3 +309,5 @@ export type InsertMaintAnalysis = z.infer<typeof insertMaintAnalysisSchema>;
 export type NotificationLog = typeof notificationLog.$inferSelect;
 export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 export type SystemSetting = typeof systemSettings.$inferSelect;
+export type MarketplaceListing = typeof marketplaceListings.$inferSelect;
+export type InsertMarketplaceListing = z.infer<typeof insertMarketplaceListingSchema>;

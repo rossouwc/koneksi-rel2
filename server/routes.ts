@@ -18,6 +18,7 @@ import { providerInviteEmail, adminInviteNotificationEmail, providerApprovedEmai
 import { db } from "./db";
 import { users, estates, userEstates, bills, outages, providers, reviews, providerVisibleEstates, providerSubscriptions } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
+import { z } from "zod";
 
 const uploadsDir = path.resolve("uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -2003,6 +2004,124 @@ export async function registerRoutes(
       }
       const mode = await storage.getSystemSetting("notification_mode");
       res.json({ mode: mode || "test" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  async function requireSupplierProvider(req: any, res: any): Promise<string | null> {
+    const user = await storage.getUser(req.session.userId!);
+    if (!user || user.role !== "supplier") {
+      res.status(403).json({ message: "Supplier access only" });
+      return null;
+    }
+    const myProviders = await storage.getProvidersByUserId(req.session.userId!);
+    if (myProviders.length === 0) {
+      res.status(404).json({ message: "No provider profile found" });
+      return null;
+    }
+    return myProviders[0].id;
+  }
+
+  app.get("/api/marketplace/my-listings", requireAuth, async (req, res) => {
+    try {
+      const providerId = await requireSupplierProvider(req, res);
+      if (!providerId) return;
+      const listings = await storage.getMyMarketplaceListings(providerId);
+      res.json(listings);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  const marketplaceCreateSchema = z.object({
+    title: z.string().min(1),
+    description: z.string().min(1),
+    listingType: z.enum(["promotion", "service", "product", "combo", "announcement"]).default("promotion"),
+    imageUrl: z.string().url().nullable().optional(),
+    price: z.number().int().nonnegative().nullable().optional(),
+    originalPrice: z.number().int().nonnegative().nullable().optional(),
+    validFrom: z.string().datetime({ offset: true }).nullable().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional()),
+    validUntil: z.string().datetime({ offset: true }).nullable().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional()),
+    ctaType: z.enum(["call", "whatsapp", "email", "website"]).default("call"),
+    isActive: z.boolean().default(true),
+  });
+
+  const marketplacePatchSchema = marketplaceCreateSchema.partial();
+
+  app.post("/api/marketplace/listings", requireAuth, async (req, res) => {
+    try {
+      const providerId = await requireSupplierProvider(req, res);
+      if (!providerId) return;
+      const parsed = marketplaceCreateSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid listing data", errors: parsed.error.flatten() });
+      const d = parsed.data;
+      const listing = await storage.createMarketplaceListing({
+        providerId,
+        title: d.title,
+        description: d.description,
+        listingType: d.listingType,
+        imageUrl: d.imageUrl ?? null,
+        price: d.price ?? null,
+        originalPrice: d.originalPrice ?? null,
+        validFrom: d.validFrom ? new Date(d.validFrom) : null,
+        validUntil: d.validUntil ? new Date(d.validUntil) : null,
+        ctaType: d.ctaType,
+        isActive: d.isActive,
+      });
+      res.json(listing);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.patch("/api/marketplace/listings/:id", requireAuth, async (req, res) => {
+    try {
+      const providerId = await requireSupplierProvider(req, res);
+      if (!providerId) return;
+      const parsed = marketplacePatchSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid listing data", errors: parsed.error.flatten() });
+      const d = parsed.data;
+      const data: Record<string, unknown> = {};
+      if (d.title !== undefined) data.title = d.title;
+      if (d.description !== undefined) data.description = d.description;
+      if (d.listingType !== undefined) data.listingType = d.listingType;
+      if (d.imageUrl !== undefined) data.imageUrl = d.imageUrl ?? null;
+      if (d.price !== undefined) data.price = d.price ?? null;
+      if (d.originalPrice !== undefined) data.originalPrice = d.originalPrice ?? null;
+      if (d.validFrom !== undefined) data.validFrom = d.validFrom ? new Date(d.validFrom) : null;
+      if (d.validUntil !== undefined) data.validUntil = d.validUntil ? new Date(d.validUntil) : null;
+      if (d.ctaType !== undefined) data.ctaType = d.ctaType;
+      if (d.isActive !== undefined) data.isActive = d.isActive;
+      const updated = await storage.updateMarketplaceListing(req.params.id, providerId, data);
+      if (!updated) return res.status(404).json({ message: "Listing not found or not owned by you" });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/marketplace/listings/:id", requireAuth, async (req, res) => {
+    try {
+      const providerId = await requireSupplierProvider(req, res);
+      if (!providerId) return;
+      const deleted = await storage.deleteMarketplaceListing(req.params.id, providerId);
+      if (!deleted) return res.status(404).json({ message: "Listing not found or not owned by you" });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/marketplace/listings", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user || (user.role !== "resident" && user.role !== "estate_admin")) {
+        return res.status(403).json({ message: "Residents and estate admins only" });
+      }
+      const estateIds = await getUserEstateIds(req.session.userId!);
+      const listings = await storage.getEstateMarketplaceListings(estateIds);
+      res.json(listings);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

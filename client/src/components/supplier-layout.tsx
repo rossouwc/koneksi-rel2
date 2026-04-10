@@ -16,12 +16,14 @@ import {
   Briefcase,
   Building2,
   ArrowRightLeft,
+  ShoppingBag,
 } from "lucide-react";
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 
 const supplierNavItems = [
   { path: "/supplier", label: "Overview", icon: LayoutDashboard },
   { path: "/supplier/profile", label: "Profile", icon: UserCircle },
+  { path: "/supplier/marketplace", label: "Marketplace", icon: ShoppingBag },
   { path: "/supplier/analytics", label: "Analytics", icon: BarChart3 },
   { path: "/supplier/billing", label: "Subscription", icon: CreditCard },
 ];
