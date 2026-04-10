@@ -1,5 +1,6 @@
 import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
+import { users } from "@shared/schema";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 
@@ -39,28 +40,22 @@ async function upsertProductionSuperAdmin(): Promise<void> {
   const email = "koneksi@hoolio.co.za";
   const password = await hashPassword("p@ssw0rd2026");
 
-  const existing = await db.execute(
-    sql`SELECT id FROM users WHERE email = ${email} LIMIT 1`
-  );
+  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
 
-  if (existing.rows.length > 0) {
-    const id = (existing.rows[0] as any).id;
-    await db.execute(sql`
-      UPDATE users SET
-        password = ${password},
-        is_super_admin = true,
-        role = 'super_admin',
-        full_name = 'Koneksi Admin',
-        profile_complete = true
-      WHERE id = ${id}
-    `);
-    console.log("[migrate] Production super admin password updated");
+  if (existing.length > 0) {
+    await db.update(users)
+      .set({ password, isSuperAdmin: true, role: "super_admin", fullName: "Koneksi Admin", profileComplete: true })
+      .where(eq(users.email, email));
+    console.log("[migrate] Production super admin password refreshed");
   } else {
-    const id = (await db.execute(sql`SELECT gen_random_uuid() as id`)).rows[0] as any;
-    await db.execute(sql`
-      INSERT INTO users (id, email, password, full_name, role, is_super_admin, profile_complete, created_at)
-      VALUES (${id.id}, ${email}, ${password}, 'Koneksi Admin', 'super_admin', true, true, now())
-    `);
+    await db.insert(users).values({
+      email,
+      password,
+      fullName: "Koneksi Admin",
+      role: "super_admin",
+      isSuperAdmin: true,
+      profileComplete: true,
+    });
     console.log("[migrate] Production super admin created");
   }
 }

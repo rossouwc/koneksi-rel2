@@ -328,10 +328,13 @@ export async function registerRoutes(
 
       const user = await storage.getUserByEmail(email);
       if (!user) {
+        console.log(`[login] user not found for email: ${email}`);
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
+      console.log(`[login] user found: ${user.email}, pwd_len=${user.password?.length}, role=${user.role}`);
       const valid = await comparePasswords(password, user.password);
+      console.log(`[login] comparePasswords result: ${valid}`);
       if (!valid) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
