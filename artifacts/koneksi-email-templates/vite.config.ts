@@ -4,6 +4,7 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { mockupPreviewPlugin } from "./mockupPreviewPlugin";
 
+const port = Number(process.env.PORT) || 20961;
 const basePath = process.env.BASE_PATH ?? "/";
 
 export default defineConfig({
@@ -34,16 +35,21 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port: 9001,
+    port,
     host: "0.0.0.0",
     allowedHosts: true,
+    proxy: {
+      "/api": "http://localhost:5000",
+      "/src": "http://localhost:5000",
+      "/sw.js": "http://localhost:5000",
+      "/assets": "http://localhost:5000",
+    },
     fs: {
-      strict: true,
-      deny: ["**/.*"],
+      strict: false,
     },
   },
   preview: {
-    port: 9001,
+    port,
     host: "0.0.0.0",
     allowedHosts: true,
   },

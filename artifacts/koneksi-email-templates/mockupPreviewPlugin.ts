@@ -1,28 +1,10 @@
 import { mkdirSync, writeFileSync } from "fs";
+import http from "http";
 import path from "path";
 import glob from "fast-glob";
 import chokidar from "chokidar";
 import type { FSWatcher } from "chokidar";
 import type { Plugin } from "vite";
-
-/**
- * Vite plugin that dynamically discovers mockup components and writes them to
- * a generated module under src/.generated. Uses fast-glob for initial
- * discovery and a dedicated chokidar watcher (with awaitWriteFinish) for
- * reliable file monitoring.
- *
- * Adapted from the component gallery plugin in pid2
- * (pkg/pid2/src/lib/vite/componentGalleryPlugin.ts).
- *
- * Generated module: "src/.generated/mockup-components.ts"
- * Exports: { modules: Record<string, () => Promise<Record<string, unknown>>> }
- *
- * When mockup files are added or removed, the generated module is rewritten.
- * Vite's normal file watching handles the update. If a relevant preview
- * request still returns 404 before the watcher settles, the dev server rescans
- * automatically. Individual file edits are handled by React Fast Refresh and
- * imported CSS HMR (no manual CSS invalidation needed).
- */
 
 const MOCKUPS_DIR = "src/components/mockups";
 const GENERATED_MODULE = "src/.generated/mockup-components.ts";
@@ -88,13 +70,6 @@ export function mockupPreviewPlugin(): Plugin {
     ].join("\n");
   }
 
-  function shouldAutoRescan(pathname: string): boolean {
-    return (
-      pathname.includes("/components/mockups/") ||
-      pathname.includes("/.generated/mockup-components")
-    );
-  }
-
   let refreshInFlight = false;
   let refreshQueued = false;
 
@@ -131,6 +106,47 @@ export function mockupPreviewPlugin(): Plugin {
 
   async function onFileAddedOrRemoved(): Promise<void> {
     await refresh();
+  }
+
+  // Proxy a request through to the main app on port 5000
+  function proxyToMainApp(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+  ): void {
+    const options: http.RequestOptions = {
+      hostname: "localhost",
+      port: 5000,
+      path: req.url,
+      method: req.method,
+      headers: { ...req.headers, host: "localhost:5000" },
+    };
+
+    const proxyReq = http.request(options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode ?? 200, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    });
+
+    proxyReq.on("error", () => {
+      res.writeHead(502);
+      res.end("Main app unavailable");
+    });
+
+    req.pipe(proxyReq, { end: true });
+  }
+
+  // Check if a path belongs to the preview server's own Vite assets
+  // (i.e. references this repo's artifact directory)
+  function isPreviewServerAsset(pathname: string): boolean {
+    // Vite internal dev utilities (same for any Vite server)
+    if (pathname === "/@vite/client") return true;
+    if (pathname.startsWith("/@vite/env")) return true;
+    if (pathname.startsWith("/@react-refresh")) return true;
+    if (pathname === "/__dummy__runtime-error-plugin") return true;
+    // Files physically inside the artifacts directory
+    if (pathname.includes("/artifacts/koneksi-email-templates/")) return true;
+    // The preview server's own generated module
+    if (pathname.includes("/.generated/mockup-components")) return true;
+    return false;
   }
 
   return {
@@ -177,16 +193,22 @@ export function mockupPreviewPlugin(): Plugin {
       viteServer.middlewares.use((req, res, next) => {
         const requestUrl = new URL(req.url ?? "/", "http://127.0.0.1");
         const pathname = requestUrl.pathname;
-        const originalEnd = res.end.bind(res);
 
-        res.end = ((...args: Parameters<typeof originalEnd>) => {
-          if (res.statusCode === 404 && shouldAutoRescan(pathname)) {
-            void refresh();
-          }
-          return originalEnd(...args);
-        }) as typeof res.end;
+        // Let /preview/ paths be handled by this Vite server
+        if (pathname.startsWith("/preview/")) {
+          next();
+          return;
+        }
 
-        next();
+        // Let Vite utilities and this preview server's own assets through
+        if (isPreviewServerAsset(pathname)) {
+          next();
+          return;
+        }
+
+        // Everything else — root, /api, /src (main app), /@fs (main app deps), etc.
+        // — gets proxied transparently to the main app on port 5000
+        proxyToMainApp(req, res);
       });
     },
 
