@@ -2128,11 +2128,10 @@ export async function registerRoutes(
 
   app.get("/api/marketplace/listings", requireAuth, async (req, res) => {
     try {
-      const user = await storage.getUser(req.session.userId!);
-      if (!user || (user.role !== "resident" && user.role !== "estate_admin")) {
-        return res.status(403).json({ message: "Residents and estate admins only" });
-      }
       const estateIds = await getUserEstateIds(req.session.userId!);
+      if (estateIds.length === 0) {
+        return res.json([]);
+      }
       const listings = await storage.getEstateMarketplaceListings(estateIds);
       res.json(listings);
     } catch (err: any) {
