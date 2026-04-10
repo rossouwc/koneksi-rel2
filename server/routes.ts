@@ -1890,6 +1890,12 @@ export async function registerRoutes(
         notification_mode: map["notification_mode"] || "test",
         test_email: map["test_email"] || "rossouw@hoolio.co.za",
         test_phone: map["test_phone"] || "0828224487",
+        smtp_host: map["smtp_host"] || "",
+        smtp_port: map["smtp_port"] || "587",
+        smtp_user: map["smtp_user"] || "",
+        smtp_pass_set: !!(map["smtp_pass"]),
+        smtp_from: map["smtp_from"] || "",
+        smtp_secure: map["smtp_secure"] || "false",
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1900,7 +1906,7 @@ export async function registerRoutes(
     try {
       const user = await storage.getUser(req.session.userId!);
       if (!user?.isSuperAdmin && user?.role !== "super_admin") return res.status(403).json({ message: "Super admin only" });
-      const { notification_mode, test_email, test_phone } = req.body;
+      const { notification_mode, test_email, test_phone, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from, smtp_secure } = req.body;
       if (notification_mode !== undefined) {
         if (notification_mode !== "test" && notification_mode !== "production") {
           return res.status(400).json({ message: "notification_mode must be 'test' or 'production'" });
@@ -1909,6 +1915,12 @@ export async function registerRoutes(
       }
       if (test_email) await storage.setSystemSetting("test_email", test_email);
       if (test_phone) await storage.setSystemSetting("test_phone", test_phone);
+      if (smtp_host !== undefined) await storage.setSystemSetting("smtp_host", smtp_host);
+      if (smtp_port !== undefined) await storage.setSystemSetting("smtp_port", String(smtp_port));
+      if (smtp_user !== undefined) await storage.setSystemSetting("smtp_user", smtp_user);
+      if (smtp_pass && smtp_pass.trim()) await storage.setSystemSetting("smtp_pass", smtp_pass);
+      if (smtp_from !== undefined) await storage.setSystemSetting("smtp_from", smtp_from);
+      if (smtp_secure !== undefined) await storage.setSystemSetting("smtp_secure", String(smtp_secure));
       const settings = await storage.getSystemSettings();
       const map: Record<string, string> = {};
       for (const s of settings) map[s.key] = s.value;
@@ -1916,9 +1928,27 @@ export async function registerRoutes(
         notification_mode: map["notification_mode"] || "test",
         test_email: map["test_email"] || "rossouw@hoolio.co.za",
         test_phone: map["test_phone"] || "0828224487",
+        smtp_host: map["smtp_host"] || "",
+        smtp_port: map["smtp_port"] || "587",
+        smtp_user: map["smtp_user"] || "",
+        smtp_pass_set: !!(map["smtp_pass"]),
+        smtp_from: map["smtp_from"] || "",
+        smtp_secure: map["smtp_secure"] || "false",
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/admin/test-email", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user?.isSuperAdmin && user?.role !== "super_admin") return res.status(403).json({ message: "Super admin only" });
+      const { testSmtpConnection } = await import("./notifications");
+      const result = await testSmtpConnection(req.body.to);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
     }
   });
 

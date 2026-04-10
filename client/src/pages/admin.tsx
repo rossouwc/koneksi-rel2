@@ -34,6 +34,11 @@ import {
   Trash2,
   Bell,
   FlaskConical,
+  Server,
+  Lock,
+  AtSign,
+  SendHorizonal,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1147,10 +1152,23 @@ function PendingSuppliers() {
   );
 }
 
+type SystemSettings = {
+  notification_mode: string;
+  test_email: string;
+  test_phone: string;
+  smtp_host: string;
+  smtp_port: string;
+  smtp_user: string;
+  smtp_pass_set: boolean;
+  smtp_from: string;
+  smtp_secure: string;
+};
+
 function NotificationSettings() {
   const { toast } = useToast();
+  const [showPass, setShowPass] = useState(false);
 
-  const { data, isLoading } = useQuery<{ notification_mode: string; test_email: string; test_phone: string }>({
+  const { data, isLoading } = useQuery<SystemSettings>({
     queryKey: ["/api/admin/system-settings"],
     queryFn: async () => {
       const res = await fetch("/api/admin/system-settings", { credentials: "include" });
@@ -1159,14 +1177,36 @@ function NotificationSettings() {
     },
   });
 
-  const mutation = useMutation({
-    mutationFn: async (settings: { notification_mode: string; test_email: string; test_phone: string }) => {
+  const saveMutation = useMutation({
+    mutationFn: async (settings: Partial<SystemSettings> & { smtp_pass?: string }) => {
       return apiRequest("PATCH", "/api/admin/system-settings", settings);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/system-settings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/notification-mode"] });
-      toast({ title: "Settings saved", description: "Notification settings have been updated." });
+      toast({ title: "Settings saved", description: "Notification settings updated." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const testEmailMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+      return res.json();
+    },
+    onSuccess: (result: { success: boolean; message: string }) => {
+      if (result.success) {
+        toast({ title: "Test email sent", description: result.message });
+      } else {
+        toast({ title: "Test email failed", description: result.message, variant: "destructive" });
+      }
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -1174,30 +1214,50 @@ function NotificationSettings() {
   });
 
   const currentMode = data?.notification_mode || "test";
-  const currentTestEmail = data?.test_email || "rossouw@hoolio.co.za";
-  const currentTestPhone = data?.test_phone || "0828224487";
-
   const [localMode, setLocalMode] = useState<string | null>(null);
-  const [localEmail, setLocalEmail] = useState<string | null>(null);
-  const [localPhone, setLocalPhone] = useState<string | null>(null);
+  const [localTestEmail, setLocalTestEmail] = useState<string | null>(null);
+  const [localTestPhone, setLocalTestPhone] = useState<string | null>(null);
+  const [smtpHost, setSmtpHost] = useState<string | null>(null);
+  const [smtpPort, setSmtpPort] = useState<string | null>(null);
+  const [smtpUser, setSmtpUser] = useState<string | null>(null);
+  const [smtpPass, setSmtpPass] = useState("");
+  const [smtpFrom, setSmtpFrom] = useState<string | null>(null);
+  const [smtpSecure, setSmtpSecure] = useState<boolean | null>(null);
 
   const displayMode = localMode ?? currentMode;
-  const displayEmail = localEmail ?? currentTestEmail;
-  const displayPhone = localPhone ?? currentTestPhone;
+  const displayTestEmail = localTestEmail ?? (data?.test_email || "rossouw@hoolio.co.za");
+  const displayTestPhone = localTestPhone ?? (data?.test_phone || "0828224487");
+  const displaySmtpHost = smtpHost ?? (data?.smtp_host || "");
+  const displaySmtpPort = smtpPort ?? (data?.smtp_port || "587");
+  const displaySmtpUser = smtpUser ?? (data?.smtp_user || "");
+  const displaySmtpFrom = smtpFrom ?? (data?.smtp_from || "");
+  const displaySmtpSecure = smtpSecure ?? (data?.smtp_secure === "true");
 
-  const handleSave = () => {
-    mutation.mutate({
+  const handleSaveNotifications = () => {
+    saveMutation.mutate({
       notification_mode: displayMode,
-      test_email: displayEmail,
-      test_phone: displayPhone,
+      test_email: displayTestEmail,
+      test_phone: displayTestPhone,
     });
+  };
+
+  const handleSaveSmtp = () => {
+    saveMutation.mutate({
+      smtp_host: displaySmtpHost,
+      smtp_port: displaySmtpPort,
+      smtp_user: displaySmtpUser,
+      smtp_pass: smtpPass || undefined,
+      smtp_from: displaySmtpFrom,
+      smtp_secure: String(displaySmtpSecure),
+    });
+    setSmtpPass("");
   };
 
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-36 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
       </div>
     );
   }
@@ -1212,20 +1272,18 @@ function NotificationSettings() {
         <p className="text-sm text-muted-foreground">Control how emails and SMS are sent from Koneksi</p>
       </div>
 
-      <div className="glass-card rounded-xl p-6 space-y-6">
+      <div className="glass-card rounded-xl p-5 space-y-5">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="font-medium text-sm">Notification Mode</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {displayMode === "test"
-                ? "All notifications go to test address/number only"
+                ? "All notifications redirect to the test addresses below"
                 : "Notifications go to real recipients"}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <span className={`text-xs font-medium ${displayMode === "test" ? "text-amber-600" : "text-muted-foreground"}`}>
-              Test
-            </span>
+            <span className={`text-xs font-semibold ${displayMode === "test" ? "text-amber-600" : "text-muted-foreground"}`}>Test</span>
             <button
               data-testid="toggle-notification-mode"
               onClick={() => setLocalMode(displayMode === "test" ? "production" : "test")}
@@ -1233,55 +1291,169 @@ function NotificationSettings() {
                 displayMode === "production" ? "bg-emerald-500" : "bg-amber-400"
               }`}
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  displayMode === "production" ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${displayMode === "production" ? "translate-x-6" : "translate-x-1"}`} />
             </button>
-            <span className={`text-xs font-medium ${displayMode === "production" ? "text-emerald-600" : "text-muted-foreground"}`}>
-              Production
-            </span>
+            <span className={`text-xs font-semibold ${displayMode === "production" ? "text-emerald-600" : "text-muted-foreground"}`}>Production</span>
           </div>
         </div>
 
         {displayMode === "test" && (
-          <div className="space-y-4 pt-2 border-t border-border/40">
+          <div className="space-y-3 pt-3 border-t border-border/40">
             <p className="text-xs text-amber-600 font-medium flex items-center gap-1.5">
               <FlaskConical className="w-3.5 h-3.5" />
-              In test mode, all notifications are redirected to the addresses below
+              All outbound notifications redirect to these addresses in test mode
             </p>
             <div>
-              <Label className="text-sm">Test Email Address</Label>
-              <Input
-                data-testid="input-test-email"
-                value={displayEmail}
-                onChange={(e) => setLocalEmail(e.target.value)}
-                placeholder="test@example.com"
-                className="rounded-xl mt-1.5"
-              />
+              <Label className="text-xs text-muted-foreground">Test Email Address</Label>
+              <Input data-testid="input-test-email" value={displayTestEmail} onChange={(e) => setLocalTestEmail(e.target.value)} placeholder="test@example.com" className="rounded-xl mt-1" />
             </div>
             <div>
-              <Label className="text-sm">Test Phone Number</Label>
-              <Input
-                data-testid="input-test-phone"
-                value={displayPhone}
-                onChange={(e) => setLocalPhone(e.target.value)}
-                placeholder="+27821234567"
-                className="rounded-xl mt-1.5"
-              />
+              <Label className="text-xs text-muted-foreground">Test Phone Number</Label>
+              <Input data-testid="input-test-phone" value={displayTestPhone} onChange={(e) => setLocalTestPhone(e.target.value)} placeholder="+27821234567" className="rounded-xl mt-1" />
             </div>
           </div>
         )}
 
-        <Button
-          className="w-full rounded-xl gradient-teal text-white"
-          onClick={handleSave}
-          disabled={mutation.isPending}
-          data-testid="button-save-notification-settings"
-        >
-          {mutation.isPending ? "Saving..." : "Save Settings"}
+        <Button className="w-full rounded-xl gradient-teal text-white" onClick={handleSaveNotifications} disabled={saveMutation.isPending} data-testid="button-save-notification-settings">
+          {saveMutation.isPending ? "Saving…" : "Save Notification Settings"}
         </Button>
+      </div>
+
+      <div>
+        <h2 className="text-lg font-semibold flex items-center gap-2 mb-1">
+          <Server className="w-5 h-5 text-primary" />
+          Email Server (SMTP)
+        </h2>
+        <p className="text-sm text-muted-foreground">Configure outbound email delivery with your SSL/TLS SMTP credentials</p>
+      </div>
+
+      <div className="glass-card rounded-xl p-5 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="sm:col-span-2">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
+              <Server className="w-3 h-3" /> SMTP Host
+            </Label>
+            <Input
+              data-testid="input-smtp-host"
+              value={displaySmtpHost}
+              onChange={(e) => setSmtpHost(e.target.value)}
+              placeholder="mail.yourdomain.com"
+              className="rounded-xl"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">Port</Label>
+            <Input
+              data-testid="input-smtp-port"
+              value={displaySmtpPort}
+              onChange={(e) => setSmtpPort(e.target.value)}
+              placeholder="587"
+              type="number"
+              className="rounded-xl"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
+              <AtSign className="w-3 h-3" /> Username / Email
+            </Label>
+            <Input
+              data-testid="input-smtp-user"
+              value={displaySmtpUser}
+              onChange={(e) => setSmtpUser(e.target.value)}
+              placeholder="notifications@yourdomain.com"
+              className="rounded-xl"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
+              <Lock className="w-3 h-3" /> Password
+              {data?.smtp_pass_set && <span className="text-emerald-600 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30">SET</span>}
+            </Label>
+            <div className="relative">
+              <Input
+                data-testid="input-smtp-pass"
+                value={smtpPass}
+                onChange={(e) => setSmtpPass(e.target.value)}
+                placeholder={data?.smtp_pass_set ? "Leave blank to keep current" : "Enter password"}
+                type={showPass ? "text" : "password"}
+                className="rounded-xl pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                data-testid="toggle-smtp-pass-visibility"
+              >
+                {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <Label className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
+            <Mail className="w-3 h-3" /> From Email Address
+          </Label>
+          <Input
+            data-testid="input-smtp-from"
+            value={displaySmtpFrom}
+            onChange={(e) => setSmtpFrom(e.target.value)}
+            placeholder="Koneksi <noreply@yourdomain.com>"
+            className="rounded-xl"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">Shown as the sender name in recipients' inboxes. Leave blank to use the username.</p>
+        </div>
+
+        <div className="flex items-center justify-between py-3 px-4 rounded-xl bg-muted/50 border border-border/40">
+          <div>
+            <p className="text-sm font-medium">Secure connection (SSL/TLS)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Enable for port 465 (SMTPS). Use STARTTLS for port 587.</p>
+          </div>
+          <button
+            data-testid="toggle-smtp-secure"
+            onClick={() => setSmtpSecure((v) => !(v ?? data?.smtp_secure === "true"))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${displaySmtpSecure ? "bg-primary" : "bg-muted-foreground/30"}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${displaySmtpSecure ? "translate-x-6" : "translate-x-1"}`} />
+          </button>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <Button
+            className="flex-1 rounded-xl gradient-teal text-white"
+            onClick={handleSaveSmtp}
+            disabled={saveMutation.isPending}
+            data-testid="button-save-smtp-settings"
+          >
+            {saveMutation.isPending ? "Saving…" : "Save SMTP Settings"}
+          </Button>
+          <Button
+            variant="outline"
+            className="rounded-xl gap-2 flex-shrink-0"
+            onClick={() => testEmailMutation.mutate()}
+            disabled={testEmailMutation.isPending}
+            data-testid="button-test-smtp"
+          >
+            {testEmailMutation.isPending ? (
+              <><Clock className="w-3.5 h-3.5 animate-spin" /> Sending…</>
+            ) : (
+              <><SendHorizonal className="w-3.5 h-3.5" /> Send Test</>
+            )}
+          </Button>
+        </div>
+
+        <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-300 space-y-1">
+          <p className="font-semibold">Common SSL/TLS Settings</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 mt-1 font-mono text-[10px]">
+            <span className="text-muted-foreground">Port 465</span><span>SSL/TLS — toggle ON</span>
+            <span className="text-muted-foreground">Port 587</span><span>STARTTLS — toggle OFF</span>
+            <span className="text-muted-foreground">Port 25</span><span>Plain SMTP — toggle OFF</span>
+          </div>
+          <p className="mt-1.5 text-[10px] text-muted-foreground">The test email will be sent to your configured test address. Check your test inbox to confirm delivery.</p>
+        </div>
       </div>
     </div>
   );
