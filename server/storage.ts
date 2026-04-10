@@ -102,7 +102,7 @@ export interface IStorage {
   getMyMarketplaceListings(providerId: string): Promise<MarketplaceListing[]>;
   updateMarketplaceListing(id: string, providerId: string, data: Partial<InsertMarketplaceListing>): Promise<MarketplaceListing>;
   deleteMarketplaceListing(id: string, providerId: string): Promise<boolean>;
-  getEstateMarketplaceListings(estateIds: string[]): Promise<(MarketplaceListing & { providerName: string; providerCategory: string; providerPhone: string | null; providerWhatsapp: string | null; providerEmail: string | null; providerWebsite: string | null })[]>;
+  getEstateMarketplaceListings(estateIds: string[]): Promise<(MarketplaceListing & { providerName: string; providerCategory: string; providerPhone: string | null; providerWhatsapp: string | null; providerEmail: string | null; providerWebsite: string | null; providerLogoUrl: string | null })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -605,7 +605,7 @@ export class DatabaseStorage implements IStorage {
     return rows.length > 0;
   }
 
-  async getEstateMarketplaceListings(estateIds: string[]): Promise<(MarketplaceListing & { providerName: string; providerCategory: string; providerPhone: string | null; providerWhatsapp: string | null; providerEmail: string | null; providerWebsite: string | null })[]> {
+  async getEstateMarketplaceListings(estateIds: string[]): Promise<(MarketplaceListing & { providerName: string; providerCategory: string; providerPhone: string | null; providerWhatsapp: string | null; providerEmail: string | null; providerWebsite: string | null; providerLogoUrl: string | null })[]> {
     if (estateIds.length === 0) return [];
 
     const visibleLinks = await db.select().from(providerVisibleEstates)
@@ -638,6 +638,12 @@ export class DatabaseStorage implements IStorage {
     const allProviderRows = await db.select().from(providers).where(inArray(providers.id, allProviderIds));
     for (const p of allProviderRows) providerMap.set(p.id, p);
 
+    const creatorIds = [...new Set(allProviderRows.map((p) => p.createdBy).filter(Boolean))] as string[];
+    const creatorUsers = creatorIds.length > 0
+      ? await db.select({ id: users.id, avatarUrl: users.avatarUrl }).from(users).where(inArray(users.id, creatorIds))
+      : [];
+    const creatorMap = new Map(creatorUsers.map((u) => [u.id, u.avatarUrl]));
+
     return listings.map((listing) => {
       const provider = providerMap.get(listing.providerId);
       return {
@@ -648,6 +654,7 @@ export class DatabaseStorage implements IStorage {
         providerWhatsapp: provider?.whatsapp ?? null,
         providerEmail: provider?.email ?? null,
         providerWebsite: provider?.website ?? null,
+        providerLogoUrl: provider?.createdBy ? (creatorMap.get(provider.createdBy) ?? null) : null,
       };
     });
   }

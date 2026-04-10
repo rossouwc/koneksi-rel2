@@ -252,8 +252,12 @@ function ProviderDetail({
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-xl" />
         <div className="relative">
           <div className="flex items-start gap-4 mb-4">
-            <div className="w-14 h-14 rounded-2xl gradient-teal-subtle flex items-center justify-center text-2xl flex-shrink-0">
-              {icon}
+            <div className="w-14 h-14 rounded-2xl gradient-teal-subtle flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden bg-white dark:bg-zinc-900">
+              {(provider as any).logoUrl ? (
+                <img src={(provider as any).logoUrl} alt={provider.name} className="w-full h-full object-contain p-1.5" />
+              ) : (
+                icon
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-xl font-bold truncate" data-testid="text-provider-name">
@@ -663,8 +667,12 @@ function ProviderCard({
     >
       <div className="relative h-[72px] bg-gradient-to-br from-teal-500/20 via-emerald-400/10 to-transparent">
         <div className="absolute bottom-0 left-5 translate-y-1/2">
-          <div className="w-[54px] h-[54px] rounded-2xl gradient-teal flex items-center justify-center text-2xl shadow-md ring-2 ring-white dark:ring-zinc-900">
-            {icon}
+          <div className="w-[54px] h-[54px] rounded-2xl gradient-teal flex items-center justify-center text-2xl shadow-md ring-2 ring-white dark:ring-zinc-900 overflow-hidden bg-white dark:bg-zinc-900">
+            {(provider as any).logoUrl ? (
+              <img src={(provider as any).logoUrl} alt={provider.name} className="w-full h-full object-contain p-1" />
+            ) : (
+              icon
+            )}
           </div>
         </div>
         {isPremium && (

@@ -17,7 +17,7 @@ import { sendEmail, sendSms } from "./notifications";
 import { providerInviteEmail, adminInviteNotificationEmail, providerApprovedEmail, providerRejectedEmail, newSupplierRegistrationEmail } from "./email-templates";
 import { db } from "./db";
 import { users, estates, userEstates, bills, outages, providers, reviews, providerVisibleEstates, providerSubscriptions } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 const uploadsDir = path.resolve("uploads");
@@ -784,11 +784,17 @@ export async function registerRoutes(
       }
 
       const tiers = await storage.getSubscriptionTiers();
+      const creatorIds = [...new Set(providerList.map((p) => p.createdBy).filter(Boolean))];
+      const creatorUsers = creatorIds.length > 0
+        ? await db.select({ id: users.id, avatarUrl: users.avatarUrl }).from(users).where(inArray(users.id, creatorIds as string[]))
+        : [];
+      const creatorMap = new Map(creatorUsers.map((u) => [u.id, u.avatarUrl]));
+
       const enriched = await Promise.all(
         providerList.map(async (p) => {
           const sub = await storage.getProviderSubscription(p.id);
           const tier = sub ? tiers.find((t) => t.id === sub.tierId) : null;
-          return { ...p, _tierName: tier?.name || null, _tierStatus: sub?.status || null };
+          return { ...p, _tierName: tier?.name || null, _tierStatus: sub?.status || null, logoUrl: creatorMap.get(p.createdBy) || null };
         })
       );
 
@@ -809,11 +815,12 @@ export async function registerRoutes(
       const reviews = await storage.getReviews(provider.id);
       const reviewsWithUsers = await Promise.all(
         reviews.map(async (r) => {
-          const user = await storage.getUser(r.userId);
-          return { ...r, user: user ? { fullName: user.fullName } : null };
+          const u = await storage.getUser(r.userId);
+          return { ...r, user: u ? { fullName: u.fullName } : null };
         })
       );
-      res.json({ provider, reviews: reviewsWithUsers });
+      const creator = provider.createdBy ? await storage.getUser(provider.createdBy) : null;
+      res.json({ provider: { ...provider, logoUrl: creator?.avatarUrl || null }, reviews: reviewsWithUsers });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -1238,6 +1245,7 @@ export async function registerRoutes(
         businessWebsite: user.businessWebsite,
         services: user.services,
         approvalStatus: user.approvalStatus,
+        avatarUrl: user.avatarUrl,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1247,7 +1255,7 @@ export async function registerRoutes(
   app.patch("/api/supplier/profile", requireSupplier, async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const { businessName, businessWebsite, services, phone } = req.body;
+      const { businessName, businessWebsite, services, phone, avatarUrl } = req.body;
 
       if (businessName !== undefined && (typeof businessName !== "string" || businessName.trim().length < 2)) {
         return res.status(400).json({ message: "Business name must be at least 2 characters" });
@@ -1279,6 +1287,7 @@ export async function registerRoutes(
       if (businessWebsite !== undefined) updates.businessWebsite = normalizedWebsite;
       if (services !== undefined) updates.services = services.map((s: string) => s.trim());
       if (phone !== undefined) updates.phone = phone.trim();
+      if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl || null;
 
       await db.update(users).set(updates).where(eq(users.id, userId));
       const updated = await storage.getUser(userId);
@@ -1291,6 +1300,7 @@ export async function registerRoutes(
         businessWebsite: updated!.businessWebsite,
         services: updated!.services,
         approvalStatus: updated!.approvalStatus,
+        avatarUrl: updated!.avatarUrl,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });

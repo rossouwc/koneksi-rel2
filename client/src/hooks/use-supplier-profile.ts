@@ -11,6 +11,7 @@ interface SupplierProfile {
   businessWebsite: string | null;
   services: string[] | null;
   approvalStatus: string | null;
+  avatarUrl: string | null;
 }
 
 interface UpdateSupplierProfileData {
@@ -18,6 +19,7 @@ interface UpdateSupplierProfileData {
   businessWebsite?: string | null;
   services?: string[];
   phone?: string;
+  avatarUrl?: string | null;
 }
 
 export function useSupplierProfile() {

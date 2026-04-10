@@ -73,6 +73,7 @@ interface ListingItem {
   providerWhatsapp: string | null;
   providerEmail: string | null;
   providerWebsite: string | null;
+  providerLogoUrl: string | null;
 }
 
 function getCtaAction(listing: ListingItem): { href: string; label: string; icon: typeof Phone; disabled: boolean } {
@@ -128,7 +129,16 @@ function ListingCard({ listing, index }: { listing: ListingItem; index: number }
             )}
           </div>
 
-          <div className="mb-1">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-6 h-6 rounded-md overflow-hidden bg-gradient-to-br from-teal-600/20 to-emerald-700/20 flex-shrink-0 flex items-center justify-center">
+              {listing.providerLogoUrl ? (
+                <img src={listing.providerLogoUrl} alt={listing.providerName} className="w-full h-full object-contain" />
+              ) : (
+                <span className="text-[9px] font-bold text-teal-700 dark:text-teal-400 uppercase">
+                  {listing.providerName.charAt(0)}
+                </span>
+              )}
+            </div>
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide" data-testid={`text-provider-name-${listing.id}`}>
               {listing.providerName} · {listing.providerCategory}
             </p>

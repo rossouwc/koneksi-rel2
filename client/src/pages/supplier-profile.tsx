@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useSupplierProfile } from "@/hooks/use-supplier-profile";
 import { useToast } from "@/hooks/use-toast";
 import { SERVICE_OPTIONS } from "@shared/schema";
 import {
-  UserCircle,
   Pencil,
   X,
   Check,
@@ -15,6 +14,9 @@ import {
   ExternalLink,
   Briefcase,
   ChevronDown,
+  Camera,
+  Loader2,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +40,28 @@ function getServiceColor(service: string) {
   return serviceBadgeColors[Math.abs(hash) % serviceBadgeColors.length];
 }
 
+function CompanyAvatar({ logoUrl, businessName, size = "lg" }: { logoUrl: string | null | undefined; businessName: string | null | undefined; size?: "sm" | "md" | "lg" }) {
+  const sizeClasses = {
+    sm: "w-10 h-10 text-base rounded-xl",
+    md: "w-12 h-12 text-lg rounded-xl",
+    lg: "w-16 h-16 text-2xl rounded-2xl",
+  };
+  const initial = businessName ? businessName.charAt(0).toUpperCase() : "B";
+
+  if (logoUrl) {
+    return (
+      <div className={`${sizeClasses[size]} overflow-hidden flex-shrink-0 bg-muted ring-2 ring-border`}>
+        <img src={logoUrl} alt={businessName || "Company"} className="w-full h-full object-contain" />
+      </div>
+    );
+  }
+  return (
+    <div className={`${sizeClasses[size]} bg-gradient-to-br from-teal-600 to-emerald-700 flex items-center justify-center flex-shrink-0`}>
+      <Briefcase className={size === "lg" ? "w-8 h-8 text-white" : "w-5 h-5 text-white"} />
+    </div>
+  );
+}
+
 export default function SupplierProfilePage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -48,6 +72,10 @@ export default function SupplierProfilePage() {
   const [editPhone, setEditPhone] = useState("");
   const [editServices, setEditServices] = useState<string[]>([]);
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const currentLogoUrl = profile?.avatarUrl ?? (user as any)?.avatarUrl ?? null;
 
   const startEdit = () => {
     if (!profile) return;
@@ -84,6 +112,47 @@ export default function SupplierProfilePage() {
     );
   };
 
+  const handleLogoUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please upload an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum 5 MB", variant: "destructive" });
+      return;
+    }
+    setLogoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch("/api/marketplace/upload-image", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      await updateProfile.mutateAsync({ avatarUrl: data.url });
+      toast({ title: "Logo updated" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    setLogoUploading(true);
+    try {
+      await updateProfile.mutateAsync({ avatarUrl: null });
+      toast({ title: "Logo removed" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -111,6 +180,65 @@ export default function SupplierProfilePage() {
           </Button>
         )}
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card rounded-2xl p-6 space-y-4"
+      >
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Company Logo</p>
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <CompanyAvatar logoUrl={currentLogoUrl} businessName={profile?.businessName || user?.fullName} size="lg" />
+              {logoUploading && (
+                <div className="absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                data-testid="input-logo-upload"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleLogoUpload(file);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl gap-1.5 text-xs"
+                disabled={logoUploading}
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="button-upload-logo"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                {currentLogoUrl ? "Change Logo" : "Upload Logo"}
+              </Button>
+              {currentLogoUrl && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-xl gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                  disabled={logoUploading}
+                  onClick={handleRemoveLogo}
+                  data-testid="button-remove-logo"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remove
+                </Button>
+              )}
+              <p className="text-[10px] text-muted-foreground">PNG, JPG up to 5 MB</p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
       {editing ? (
         <motion.div
@@ -232,9 +360,7 @@ export default function SupplierProfilePage() {
           className="glass-card rounded-2xl p-6 space-y-5"
         >
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-700 flex items-center justify-center flex-shrink-0">
-              <Briefcase className="w-8 h-8 text-white" />
-            </div>
+            <CompanyAvatar logoUrl={currentLogoUrl} businessName={profile?.businessName || user?.fullName} size="lg" />
             <div className="min-w-0">
               <h2 className="text-xl font-bold" data-testid="text-profile-business-name">
                 {profile?.businessName || user?.fullName}

@@ -46,6 +46,7 @@ function SupplierAvatarDropdown() {
   const initials = user?.fullName
     ? user.fullName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "S";
+  const logoUrl = (user as any)?.avatarUrl as string | null | undefined;
 
   return (
     <div className="relative" ref={ref}>
@@ -54,8 +55,12 @@ function SupplierAvatarDropdown() {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 rounded-full hover:opacity-90 transition-opacity"
       >
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-600 to-emerald-700 flex items-center justify-center text-white text-xs font-bold">
-          {initials}
+        <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-teal-600 to-emerald-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+          {logoUrl ? (
+            <img src={logoUrl} alt={user?.businessName || user?.fullName || ""} className="w-full h-full object-contain" />
+          ) : (
+            initials
+          )}
         </div>
         <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
