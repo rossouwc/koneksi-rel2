@@ -7,6 +7,9 @@ import { mockupPreviewPlugin } from "./mockupPreviewPlugin";
 const port = Number(process.env.PORT) || 20961;
 const basePath = process.env.BASE_PATH ?? "/";
 
+// Root of the main application (two levels up from this artifact)
+const mainAppRoot = path.resolve(import.meta.dirname, "../..");
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -18,7 +21,7 @@ export default defineConfig({
       ? [
           await import("@replit/vite-plugin-cartographer").then((m) =>
             m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
+              root: mainAppRoot,
             }),
           ),
         ]
@@ -38,12 +41,7 @@ export default defineConfig({
     port,
     host: "0.0.0.0",
     allowedHosts: true,
-    proxy: {
-      "/api": "http://localhost:5000",
-      "/src": "http://localhost:5000",
-      "/sw.js": "http://localhost:5000",
-      "/assets": "http://localhost:5000",
-    },
+    // All routing handled by mockupPreviewPlugin middleware — no server.proxy needed
     fs: {
       strict: false,
     },
