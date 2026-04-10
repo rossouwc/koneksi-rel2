@@ -7,8 +7,6 @@ import { usePortal } from "@/lib/portal-context";
 import {
   LayoutDashboard,
   UserCircle,
-  Calendar,
-  MessageSquare,
   BarChart3,
   CreditCard,
   LogOut,
@@ -24,10 +22,8 @@ import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 const supplierNavItems = [
   { path: "/supplier", label: "Overview", icon: LayoutDashboard },
   { path: "/supplier/profile", label: "Profile", icon: UserCircle },
-  { path: "/supplier/calendar", label: "Calendar", icon: Calendar },
-  { path: "/supplier/bookings", label: "Bookings", icon: MessageSquare },
   { path: "/supplier/analytics", label: "Analytics", icon: BarChart3 },
-  { path: "/supplier/billing", label: "Billing", icon: CreditCard },
+  { path: "/supplier/billing", label: "Subscription", icon: CreditCard },
 ];
 
 function SupplierAvatarDropdown() {
