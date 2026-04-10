@@ -62,7 +62,8 @@ async function logNotification(
 export async function sendEmail(
   to: string,
   subject: string,
-  body: string
+  body: string,
+  html?: string
 ): Promise<void> {
   const { mode, testEmail } = await getNotificationMode();
   const actualTo = mode === "test" ? testEmail : to;
@@ -83,7 +84,7 @@ export async function sendEmail(
       auth: { user, pass },
     });
 
-    await transporter.sendMail({ from, to: actualTo, subject, text: body });
+    await transporter.sendMail({ from, to: actualTo, subject, text: body, ...(html ? { html } : {}) });
     console.log(`[notifications] Email sent to ${actualTo}`);
     await logNotification("email", actualTo, subject, body, "sent");
   } catch (err: any) {
@@ -131,13 +132,16 @@ export async function testSmtpConnection(toOverride?: string): Promise<{ success
   try {
     const transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
     await transporter.verify();
+    const { smtpTestEmail } = await import("./email-templates");
+    const template = smtpTestEmail(host, port, secure, from);
     await transporter.sendMail({
       from,
       to,
-      subject: "Koneksi — SMTP test email",
-      text: `This is a test email from Koneksi.\n\nSMTP settings are working correctly.\n\nServer: ${host}:${port} (${secure ? "SSL/TLS" : "STARTTLS"})\nFrom: ${from}`,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
     });
-    await logNotification("email", to, "Koneksi — SMTP test email", "Test email", "sent");
+    await logNotification("email", to, template.subject, "Test email", "sent");
     return { success: true, message: `Test email sent successfully to ${to}` };
   } catch (err: any) {
     return { success: false, message: err.message || "Failed to send test email" };

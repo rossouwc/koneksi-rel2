@@ -14,6 +14,7 @@ import { analyzeMaintenancePhoto } from "./openai-maint-analyzer";
 import { buildPayFastUrl, validatePayFastITN } from "./payfast";
 import { searchAreas, getAreaInfo, getStatus as getEspStatus } from "./eskomsepush";
 import { sendEmail, sendSms } from "./notifications";
+import { providerInviteEmail, adminInviteNotificationEmail, providerApprovedEmail, providerRejectedEmail } from "./email-templates";
 import { db } from "./db";
 import { users, estates, userEstates, bills, outages, providers, reviews, providerVisibleEstates } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
@@ -907,12 +908,18 @@ export async function registerRoutes(
       const inviter = await storage.getUser(userId);
       const estate = await storage.getEstate(estateId);
 
-      const emailBody = `Hi ${providerName},\n\nYou've been invited by ${inviter?.fullName || "a resident"} to join Koneksi as a provider for ${estate?.name || "an estate"}.\n\nClick the link below to register:\n${inviteUrl}\n\nCategory: ${category || "General"}\n\nKoneksi Team`;
       const smsBody = `Koneksi: ${inviter?.fullName || "A resident"} has invited you to join ${estate?.name || "an estate"} as a provider. Register here: ${inviteUrl}`;
 
       let notified = false;
       if (providerEmail) {
-        sendEmail(providerEmail, `You've been invited to join ${estate?.name || "an estate"} on Koneksi`, emailBody).catch(() => {});
+        const inviteTemplate = providerInviteEmail(
+          providerName,
+          inviter?.fullName || "a resident",
+          estate?.name || "an estate",
+          inviteUrl,
+          category || "General"
+        );
+        sendEmail(providerEmail, inviteTemplate.subject, inviteTemplate.text, inviteTemplate.html).catch(() => {});
         notified = true;
       }
       if (providerPhone) {
@@ -927,11 +934,14 @@ export async function registerRoutes(
       const estateAdmins = await storage.getEstateResidents(estateId);
       const admins = estateAdmins.filter((r) => r.role === "estate_admin");
       for (const admin of admins) {
-        sendEmail(
-          admin.user.email,
-          `New provider invitation sent for ${estate?.name || "your estate"}`,
-          `Hi ${admin.user.fullName},\n\nA new provider invitation was sent to ${providerName} (${category || "General"}) for ${estate?.name}.\n\nInvited by: ${inviter?.fullName || "a resident"}\n\nKoneksi Team`
-        ).catch(() => {});
+        const adminTemplate = adminInviteNotificationEmail(
+          admin.user.fullName,
+          providerName,
+          category || "General",
+          estate?.name || "your estate",
+          inviter?.fullName || "a resident"
+        );
+        sendEmail(admin.user.email, adminTemplate.subject, adminTemplate.text, adminTemplate.html).catch(() => {});
       }
 
       res.json(finalInvitation);
@@ -973,11 +983,8 @@ export async function registerRoutes(
       const estate = await storage.getEstate(estateId);
 
       if (provider.email) {
-        sendEmail(
-          provider.email,
-          `You've been approved for ${estate?.name || "an estate"} on Koneksi`,
-          `Hi ${provider.name},\n\nGreat news! You've been approved as a provider for ${estate?.name || "an estate"} on Koneksi.\n\nYou can now log in and start receiving service requests.\n\nKoneksi Team`
-        ).catch(() => {});
+        const approvedTemplate = providerApprovedEmail(provider.name, estate?.name || "an estate");
+        sendEmail(provider.email, approvedTemplate.subject, approvedTemplate.text, approvedTemplate.html).catch(() => {});
       }
       if (provider.phone) {
         sendSms(
@@ -1014,11 +1021,8 @@ export async function registerRoutes(
       await storage.rejectProvider(providerId);
 
       if (provider.email) {
-        sendEmail(
-          provider.email,
-          `Update on your provider application for ${estate?.name || "an estate"}`,
-          `Hi ${provider.name},\n\nThank you for your interest in joining ${estate?.name || "an estate"} on Koneksi. After careful consideration, the estate admin has decided not to proceed with your application at this time.\n\nWe appreciate your interest and encourage you to explore other opportunities on Koneksi.\n\nKoneksi Team`
-        ).catch(() => {});
+        const rejectedTemplate = providerRejectedEmail(provider.name, estate?.name || "an estate");
+        sendEmail(provider.email, rejectedTemplate.subject, rejectedTemplate.text, rejectedTemplate.html).catch(() => {});
       }
       if (provider.phone) {
         sendSms(
