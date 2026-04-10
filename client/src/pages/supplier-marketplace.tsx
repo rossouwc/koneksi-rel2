@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
@@ -22,6 +22,9 @@ import {
   X,
   Calendar,
   DollarSign,
+  Upload,
+  Link,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +78,7 @@ const formSchema = z.object({
   title: z.string().min(2, "Title is required"),
   description: z.string().min(5, "Description is required"),
   listingType: z.enum(LISTING_TYPES),
-  imageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  imageUrl: z.string().optional(),
   priceRands: z.string().optional(),
   originalPriceRands: z.string().optional(),
   validFrom: z.string().optional(),
@@ -220,6 +223,123 @@ function ListingCard({
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function ImageUploadField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const { toast } = useToast();
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/marketplace/upload-image", {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(err.message);
+      }
+      const { url } = await res.json();
+      onChange(url);
+      setShowUrlInput(false);
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  if (value) {
+    return (
+      <div className="space-y-2">
+        <div className="relative rounded-xl overflow-hidden bg-muted/30 aspect-[16/7] border border-border">
+          <img src={value} alt="Listing preview" className="w-full h-full object-cover" />
+          <button
+            type="button"
+            onClick={() => { onChange(""); setShowUrlInput(false); }}
+            className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 transition-colors"
+            data-testid="button-remove-image"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          disabled={uploading}
+        >
+          <Upload className="w-3 h-3" />
+          Replace photo
+        </button>
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleFileChange} data-testid="input-image-file" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div
+        onClick={() => !uploading && fileRef.current?.click()}
+        className="border-2 border-dashed border-border hover:border-teal-500/50 rounded-xl p-6 text-center cursor-pointer transition-colors group"
+        data-testid="zone-image-upload"
+      >
+        {uploading ? (
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-7 h-7 text-teal-600 animate-spin" />
+            <p className="text-sm text-muted-foreground">Uploading…</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-teal-500/10 flex items-center justify-center group-hover:bg-teal-500/20 transition-colors">
+              <Upload className="w-5 h-5 text-teal-600" />
+            </div>
+            <p className="text-sm font-medium">Upload a photo</p>
+            <p className="text-xs text-muted-foreground">JPG, PNG, WebP or GIF · max 10 MB</p>
+          </div>
+        )}
+      </div>
+      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleFileChange} data-testid="input-image-file" />
+
+      <button
+        type="button"
+        onClick={() => setShowUrlInput((v) => !v)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        data-testid="button-toggle-url-input"
+      >
+        <Link className="w-3 h-3" />
+        {showUrlInput ? "Hide URL input" : "Or paste an image URL"}
+      </button>
+
+      {showUrlInput && (
+        <div className="relative">
+          <Image className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="https://..."
+            className="pl-9 rounded-xl"
+            data-testid="input-listing-image-url"
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -409,12 +529,9 @@ function ListingFormModal({
               name="imageUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Image URL (optional)</FormLabel>
+                  <FormLabel>Photo (optional)</FormLabel>
                   <FormControl>
-                    <div className="relative">
-                      <Image className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                      <Input {...field} placeholder="https://..." className="pl-9 rounded-xl" data-testid="input-listing-image-url" />
-                    </div>
+                    <ImageUploadField value={field.value ?? ""} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

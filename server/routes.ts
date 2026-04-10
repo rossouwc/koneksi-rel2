@@ -2023,6 +2023,16 @@ export async function registerRoutes(
     return myProviders[0].id;
   }
 
+  app.post("/api/marketplace/upload-image", requireAuth, upload.single("image"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No image file provided" });
+      const url = `/uploads/${req.file.filename}`;
+      res.json({ url });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/marketplace/my-listings", requireAuth, async (req, res) => {
     try {
       const providerId = await requireSupplierProvider(req, res);
@@ -2038,7 +2048,7 @@ export async function registerRoutes(
     title: z.string().min(1),
     description: z.string().min(1),
     listingType: z.enum(["promotion", "service", "product", "combo", "announcement"]).default("promotion"),
-    imageUrl: z.string().url().nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
     price: z.number().int().nonnegative().nullable().optional(),
     originalPrice: z.number().int().nonnegative().nullable().optional(),
     validFrom: z.string().datetime({ offset: true }).nullable().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional()),
