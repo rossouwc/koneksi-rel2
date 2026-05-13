@@ -226,6 +226,19 @@ export const marketplaceListings = pgTable("marketplace_listings", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const residentInviteStatusEnum = pgEnum("resident_invite_status", ["pending", "joined"]);
+
+export const residentInvites = pgTable("resident_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  estateId: varchar("estate_id").notNull(),
+  invitedByUserId: varchar("invited_by_user_id").notNull(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  status: residentInviteStatusEnum("status").default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, isSuperAdmin: true, profileComplete: true, role: true, approvalStatus: true });
 export const insertEstateSchema = createInsertSchema(estates).omit({ id: true, createdAt: true, inviteCode: true });
 export const insertUserEstateSchema = createInsertSchema(userEstates).omit({ id: true, joinedAt: true });
@@ -241,6 +254,7 @@ export const insertProviderInvitationSchema = createInsertSchema(providerInvitat
 export const insertMaintAnalysisSchema = createInsertSchema(maintAnalyses).omit({ id: true, createdAt: true });
 export const insertNotificationLogSchema = createInsertSchema(notificationLog).omit({ id: true, createdAt: true });
 export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings).omit({ id: true, createdAt: true });
+export const insertResidentInviteSchema = createInsertSchema(residentInvites).omit({ id: true, createdAt: true, status: true });
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -311,3 +325,5 @@ export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
 export type SystemSetting = typeof systemSettings.$inferSelect;
 export type MarketplaceListing = typeof marketplaceListings.$inferSelect;
 export type InsertMarketplaceListing = z.infer<typeof insertMarketplaceListingSchema>;
+export type ResidentInvite = typeof residentInvites.$inferSelect;
+export type InsertResidentInvite = z.infer<typeof insertResidentInviteSchema>;

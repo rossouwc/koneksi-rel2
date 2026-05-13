@@ -22,6 +22,7 @@ import {
   Home,
   FlaskConical,
   ShoppingBag,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +42,10 @@ const navItems = [
   { path: "/providers", label: "Providers", icon: Store },
   { path: "/marketplace", label: "Marketplace", icon: ShoppingBag },
   { path: "/join-estate", label: "Estates", icon: Building2 },
+];
+
+const adminNavItems = [
+  { path: "/residents", label: "Residents", icon: Users },
 ];
 
 function AvatarDropdown() {
@@ -160,7 +165,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const isTestMode = notificationModeData?.mode === "test" || !notificationModeData;
 
-  const allNavItems = navItems;
+  const allNavItems = isEstateAdmin
+    ? [...navItems, ...adminNavItems]
+    : navItems;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -197,7 +204,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
 
             <nav className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
+              {allNavItems.map((item) => {
                 const isActive = location === item.path;
                 return (
                   <Link key={item.path} href={item.path}>

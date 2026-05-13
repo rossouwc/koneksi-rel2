@@ -14,10 +14,11 @@ import {
   type MaintAnalysis, type InsertMaintAnalysis,
   type SystemSetting,
   type MarketplaceListing, type InsertMarketplaceListing,
+  type ResidentInvite, type InsertResidentInvite,
   users, estates, userEstates, bills, outages, providers, reviews,
   subscriptionTiers, providerSubscriptions, providerVisibleEstates,
   userProperties, providerInvitations, maintAnalyses, systemSettings,
-  marketplaceListings,
+  marketplaceListings, residentInvites,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull, or, inArray, sql } from "drizzle-orm";
@@ -103,6 +104,12 @@ export interface IStorage {
   updateMarketplaceListing(id: string, providerId: string, data: Partial<InsertMarketplaceListing>): Promise<MarketplaceListing>;
   deleteMarketplaceListing(id: string, providerId: string): Promise<boolean>;
   getEstateMarketplaceListings(estateIds: string[]): Promise<(MarketplaceListing & { providerName: string; providerCategory: string; providerPhone: string | null; providerWhatsapp: string | null; providerEmail: string | null; providerWebsite: string | null; providerLogoUrl: string | null })[]>;
+
+  getResidentInvites(estateId: string): Promise<ResidentInvite[]>;
+  createResidentInvite(data: InsertResidentInvite): Promise<ResidentInvite>;
+  markResidentInviteJoined(estateId: string, email: string): Promise<void>;
+  removeResidentFromEstate(estateId: string, userId: string): Promise<void>;
+  getEstateApprovedResidents(estateId: string): Promise<{ user: User; role: string; joinedAt: Date | null }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -603,6 +610,40 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(marketplaceListings.id, id), eq(marketplaceListings.providerId, providerId)))
       .returning({ id: marketplaceListings.id });
     return rows.length > 0;
+  }
+
+  async getResidentInvites(estateId: string): Promise<ResidentInvite[]> {
+    return db.select().from(residentInvites)
+      .where(eq(residentInvites.estateId, estateId))
+      .orderBy(desc(residentInvites.createdAt));
+  }
+
+  async createResidentInvite(data: InsertResidentInvite): Promise<ResidentInvite> {
+    const [created] = await db.insert(residentInvites).values(data).returning();
+    return created;
+  }
+
+  async markResidentInviteJoined(estateId: string, email: string): Promise<void> {
+    await db.update(residentInvites)
+      .set({ status: "joined" })
+      .where(and(eq(residentInvites.estateId, estateId), eq(residentInvites.email, email)));
+  }
+
+  async removeResidentFromEstate(estateId: string, userId: string): Promise<void> {
+    await db.delete(userEstates)
+      .where(and(eq(userEstates.estateId, estateId), eq(userEstates.userId, userId)));
+  }
+
+  async getEstateApprovedResidents(estateId: string): Promise<{ user: User; role: string; joinedAt: Date | null }[]> {
+    const links = await db.select().from(userEstates).where(
+      and(eq(userEstates.estateId, estateId), eq(userEstates.approvalStatus, "approved"))
+    );
+    const results: { user: User; role: string; joinedAt: Date | null }[] = [];
+    for (const link of links) {
+      const [user] = await db.select().from(users).where(eq(users.id, link.userId));
+      if (user) results.push({ user: { ...user, password: "" }, role: link.roleInEstate, joinedAt: link.joinedAt });
+    }
+    return results;
   }
 
   async getEstateMarketplaceListings(estateIds: string[]): Promise<(MarketplaceListing & { providerName: string; providerCategory: string; providerPhone: string | null; providerWhatsapp: string | null; providerEmail: string | null; providerWebsite: string | null; providerLogoUrl: string | null })[]> {

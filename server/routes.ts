@@ -439,6 +439,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Already a member of this estate" });
       }
       await storage.addUserToEstate({ userId: req.session.userId!, estateId: estate.id, roleInEstate: "resident" });
+      // Mark any invite for this user's email as joined
+      const joiningUser = await storage.getUser(req.session.userId!);
+      if (joiningUser?.email) {
+        await storage.markResidentInviteJoined(estate.id, joiningUser.email).catch(() => {});
+      }
       res.json(estate);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -509,6 +514,61 @@ export async function registerRoutes(
       await db.delete(userEstates)
         .where(sql`${userEstates.userId} = ${userId} AND ${userEstates.estateId} = ${estateId}`);
       res.json({ message: "Resident rejected" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/estates/:id/residents/:userId", requireAuth, async (req, res) => {
+    try {
+      const { id: estateId, userId } = req.params;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can remove residents" });
+      }
+      if (userId === req.session.userId) {
+        return res.status(400).json({ message: "You cannot remove yourself from the estate" });
+      }
+      await storage.removeResidentFromEstate(estateId, userId);
+      res.json({ message: "Resident removed" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/estates/:id/resident-invites", requireAuth, async (req, res) => {
+    try {
+      const estateId = req.params.id;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can view resident invites" });
+      }
+      const invites = await storage.getResidentInvites(estateId);
+      res.json(invites);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/estates/:id/resident-invites", requireAuth, async (req, res) => {
+    try {
+      const estateId = req.params.id;
+      const link = await storage.getUserEstateLink(req.session.userId!, estateId);
+      if (!link || link.roleInEstate !== "estate_admin" || link.approvalStatus !== "approved") {
+        return res.status(403).json({ message: "Only estate admins can invite residents" });
+      }
+      const { name, email, phone } = req.body;
+      if (!name || !email) {
+        return res.status(400).json({ message: "Name and email are required" });
+      }
+      const invite = await storage.createResidentInvite({
+        estateId,
+        invitedByUserId: req.session.userId!,
+        name,
+        email,
+        phone: phone || null,
+      });
+      res.json(invite);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
