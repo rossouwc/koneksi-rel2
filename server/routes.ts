@@ -442,7 +442,9 @@ export async function registerRoutes(
       // Mark any invite for this user's email as joined
       const joiningUser = await storage.getUser(req.session.userId!);
       if (joiningUser?.email) {
-        await storage.markResidentInviteJoined(estate.id, joiningUser.email).catch(() => {});
+        await storage.markResidentInviteJoined(estate.id, joiningUser.email).catch((err) => {
+          console.warn("[join] Failed to mark resident invite as joined:", err?.message);
+        });
       }
       res.json(estate);
     } catch (err: any) {

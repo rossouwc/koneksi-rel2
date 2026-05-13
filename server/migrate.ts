@@ -31,6 +31,35 @@ export async function runMigrations(): Promise<void> {
     )
   `);
 
+  await db.execute(sql`
+    DO $$ BEGIN
+      CREATE TYPE resident_invite_status AS ENUM ('pending', 'joined');
+    EXCEPTION
+      WHEN duplicate_object THEN null;
+    END $$
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS resident_invites (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      estate_id varchar NOT NULL,
+      invited_by_user_id varchar NOT NULL,
+      name text NOT NULL,
+      email text NOT NULL,
+      phone text,
+      status resident_invite_status DEFAULT 'pending',
+      created_at timestamp DEFAULT now()
+    )
+  `);
+
+  await db.execute(sql`
+    CREATE INDEX IF NOT EXISTS idx_resident_invites_estate ON resident_invites(estate_id)
+  `);
+
+  await db.execute(sql`
+    CREATE INDEX IF NOT EXISTS idx_resident_invites_email ON resident_invites(email)
+  `);
+
   if (process.env.NODE_ENV === "production") {
     await upsertProductionSuperAdmin();
   }
