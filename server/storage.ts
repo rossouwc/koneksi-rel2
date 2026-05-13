@@ -109,7 +109,6 @@ export interface IStorage {
   createResidentInvite(data: InsertResidentInvite): Promise<ResidentInvite>;
   markResidentInviteJoined(estateId: string, email: string): Promise<void>;
   removeResidentFromEstate(estateId: string, userId: string): Promise<void>;
-  getEstateApprovedResidents(estateId: string): Promise<{ user: User; role: string; joinedAt: Date | null }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -634,18 +633,6 @@ export class DatabaseStorage implements IStorage {
   async removeResidentFromEstate(estateId: string, userId: string): Promise<void> {
     await db.delete(userEstates)
       .where(and(eq(userEstates.estateId, estateId), eq(userEstates.userId, userId)));
-  }
-
-  async getEstateApprovedResidents(estateId: string): Promise<{ user: User; role: string; joinedAt: Date | null }[]> {
-    const links = await db.select().from(userEstates).where(
-      and(eq(userEstates.estateId, estateId), eq(userEstates.approvalStatus, "approved"))
-    );
-    const results: { user: User; role: string; joinedAt: Date | null }[] = [];
-    for (const link of links) {
-      const [user] = await db.select().from(users).where(eq(users.id, link.userId));
-      if (user) results.push({ user: { ...user, password: "" }, role: link.roleInEstate, joinedAt: link.joinedAt });
-    }
-    return results;
   }
 
   async getEstateMarketplaceListings(estateIds: string[]): Promise<(MarketplaceListing & { providerName: string; providerCategory: string; providerPhone: string | null; providerWhatsapp: string | null; providerEmail: string | null; providerWebsite: string | null; providerLogoUrl: string | null })[]> {

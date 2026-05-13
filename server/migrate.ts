@@ -42,13 +42,13 @@ export async function runMigrations(): Promise<void> {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS resident_invites (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-      estate_id varchar NOT NULL,
-      invited_by_user_id varchar NOT NULL,
+      estate_id varchar NOT NULL REFERENCES estates(id) ON DELETE CASCADE,
+      invited_by_user_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name text NOT NULL,
       email text NOT NULL,
       phone text,
-      status resident_invite_status DEFAULT 'pending',
-      created_at timestamp DEFAULT now()
+      status resident_invite_status NOT NULL DEFAULT 'pending',
+      created_at timestamp NOT NULL DEFAULT now()
     )
   `);
 
