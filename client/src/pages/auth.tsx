@@ -167,7 +167,7 @@ export default function AuthPage() {
   const isSupplierMode = mode === "register" && registerType === "supplier";
   const isEstateMode = mode === "register" && registerType === "estate";
   const isResidentMode = mode === "register" && registerType === "resident";
-  const showGoogle = mode === "login" || isResidentMode;
+  const showGoogle = mode === "login";
 
   const inputClass = "pl-10 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent";
 
