@@ -145,12 +145,12 @@ function AvatarDropdown() {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
-  const { currentEstate, currentProperty, approvedEstates, properties, selectById, pendingEstates } = useEstate();
+  const { currentEstate, currentProperty, approvedEstates, properties, selectById, pendingEstates, isEstateAdmin: isCurrentEstateAdmin } = useEstate();
   const { theme, toggleTheme } = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const isAdmin = user?.isSuperAdmin || user?.role === "super_admin";
-  const isEstateAdmin = user?.role === "estate_admin";
+  const isEstateAdmin = isCurrentEstateAdmin;
 
   const { data: notificationModeData } = useQuery<{ mode: string }>({
     queryKey: ["/api/admin/notification-mode"],
