@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useEstate } from "@/lib/estate-context";
+import {
+  buildInviteMessage,
+  buildInviteUrl,
+  buildWhatsAppHref,
+  buildEmailHref,
+  buildSmsHref,
+} from "@/lib/share-invite";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -83,12 +90,6 @@ function formatDate(dateStr: string | null) {
   return new Date(dateStr).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function buildInviteMessage(estateName: string, inviteCode: string, name?: string) {
-  const greeting = name ? `Hi ${name}, ` : "";
-  const appUrl = `${window.location.origin}/join-estate?code=${inviteCode}`;
-  return `${greeting}you're invited to join ${estateName} on Koneksi! Use invite code *${inviteCode}* or tap the link to join: ${appUrl}`;
-}
-
 function ShareSheet({ estate, name, email, phone, onClose }: {
   estate: { name: string; inviteCode: string };
   name?: string;
@@ -97,9 +98,9 @@ function ShareSheet({ estate, name, email, phone, onClose }: {
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const message = buildInviteMessage(estate.name, estate.inviteCode, name);
-  const encodedMsg = encodeURIComponent(message);
-  const appUrl = `${window.location.origin}/join-estate?code=${estate.inviteCode}`;
+  const opts = { estateName: estate.name, inviteCode: estate.inviteCode, recipientName: name, recipientEmail: email, recipientPhone: phone };
+  const message = buildInviteMessage(opts);
+  const appUrl = buildInviteUrl(estate.inviteCode);
 
   const copyLink = () => {
     navigator.clipboard.writeText(appUrl);
@@ -107,12 +108,9 @@ function ShareSheet({ estate, name, email, phone, onClose }: {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const whatsappHref = phone
-    ? `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodedMsg}`
-    : `https://wa.me/?text=${encodedMsg}`;
-
-  const emailHref = `mailto:${email || ""}?subject=Join ${estate.name} on Koneksi&body=${encodeURIComponent(message)}`;
-  const smsHref = `sms:${phone || ""}?body=${encodedMsg}`;
+  const whatsappHref = buildWhatsAppHref(message, phone);
+  const emailHref = buildEmailHref(opts);
+  const smsHref = buildSmsHref(message, phone);
 
   return (
     <div className="space-y-3 pt-2">
@@ -343,12 +341,13 @@ export default function ResidentsPage() {
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
   const [shareTarget, setShareTarget] = useState<ResidentInvite | null>(null);
 
-  if (!isEstateAdmin || !currentEstate) {
-    setLocation("/");
-    return null;
-  }
+  useEffect(() => {
+    if (!isEstateAdmin || !currentEstate) {
+      setLocation("/");
+    }
+  }, [isEstateAdmin, currentEstate, setLocation]);
 
-  const estateId = currentEstate.id;
+  const estateId = currentEstate?.id ?? "";
 
   const { data: allResidents = [], isLoading: residentsLoading } = useQuery<Resident[]>({
     queryKey: [`/api/estates/${estateId}/residents`],

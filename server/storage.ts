@@ -619,14 +619,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createResidentInvite(data: InsertResidentInvite): Promise<ResidentInvite> {
-    const [created] = await db.insert(residentInvites).values(data).returning();
+    const normalized = { ...data, email: data.email.trim().toLowerCase() };
+    const [created] = await db.insert(residentInvites).values(normalized).returning();
     return created;
   }
 
   async markResidentInviteJoined(estateId: string, email: string): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
     await db.update(residentInvites)
       .set({ status: "joined" })
-      .where(and(eq(residentInvites.estateId, estateId), eq(residentInvites.email, email)));
+      .where(and(eq(residentInvites.estateId, estateId), eq(residentInvites.email, normalizedEmail)));
   }
 
   async removeResidentFromEstate(estateId: string, userId: string): Promise<void> {
