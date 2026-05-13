@@ -2138,11 +2138,18 @@ export async function registerRoutes(
 
   app.get("/api/marketplace/listings", requireAuth, async (req, res) => {
     try {
-      const estateIds = await getUserEstateIds(req.session.userId!);
-      if (estateIds.length === 0) {
+      const { estateId } = req.query as { estateId?: string };
+
+      if (!estateId) {
         return res.json([]);
       }
-      const listings = await storage.getEstateMarketplaceListings(estateIds);
+
+      const memberEstateIds = await getUserEstateIds(req.session.userId!);
+      if (!memberEstateIds.includes(estateId)) {
+        return res.status(403).json({ message: "Not a member of this estate" });
+      }
+
+      const listings = await storage.getEstateMarketplaceListings([estateId]);
       res.json(listings);
     } catch (err: any) {
       res.status(500).json({ message: err.message });

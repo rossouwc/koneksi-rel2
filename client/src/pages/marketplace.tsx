@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useCurrentEstate } from "@/lib/estate-context";
 import { motion } from "framer-motion";
 import { format, isPast, differenceInDays } from "date-fns";
 import {
@@ -193,9 +194,14 @@ function ListingCard({ listing, index }: { listing: ListingItem; index: number }
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
+  const { estateId } = useCurrentEstate();
+
+  const listingsUrl = estateId
+    ? `/api/marketplace/listings?estateId=${estateId}`
+    : "/api/marketplace/listings";
 
   const { data: listings = [], isLoading, isError } = useQuery<ListingItem[]>({
-    queryKey: ["/api/marketplace/listings"],
+    queryKey: [listingsUrl],
   });
 
   const filtered = listings.filter((item) => {
