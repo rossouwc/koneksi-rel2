@@ -348,17 +348,21 @@ export default function ResidentsPage() {
   }, [isEstateAdmin, currentEstate, setLocation]);
 
   const estateId = currentEstate?.id ?? "";
+  const canFetch = !!estateId && isEstateAdmin;
 
   const { data: allResidents = [], isLoading: residentsLoading } = useQuery<Resident[]>({
     queryKey: [`/api/estates/${estateId}/residents`],
+    enabled: canFetch,
   });
 
   const { data: pendingResidents = [], isLoading: pendingLoading } = useQuery<{ userId: string; fullName: string; email: string; joinedAt: string }[]>({
     queryKey: [`/api/estates/${estateId}/pending-residents`],
+    enabled: canFetch,
   });
 
   const { data: residentInvites = [], isLoading: invitesLoading } = useQuery<ResidentInvite[]>({
     queryKey: [`/api/estates/${estateId}/resident-invites`],
+    enabled: canFetch,
   });
 
   const approvedMembers = allResidents.filter((r) => r.approvalStatus === "approved");
@@ -412,6 +416,8 @@ export default function ResidentsPage() {
     { key: "pending", label: "Pending", count: pendingResidents.length },
     { key: "invited", label: "Invited", count: residentInvites.length },
   ];
+
+  if (!currentEstate || !isEstateAdmin) return null;
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">

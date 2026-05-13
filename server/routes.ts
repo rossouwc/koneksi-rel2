@@ -531,6 +531,10 @@ export async function registerRoutes(
       if (userId === req.session.userId) {
         return res.status(400).json({ message: "You cannot remove yourself from the estate" });
       }
+      const targetLink = await storage.getUserEstateLink(userId, estateId);
+      if (targetLink?.roleInEstate === "estate_admin") {
+        return res.status(403).json({ message: "Estate admins cannot be removed via this route" });
+      }
       await storage.removeResidentFromEstate(estateId, userId);
       res.json({ message: "Resident removed" });
     } catch (err: any) {
