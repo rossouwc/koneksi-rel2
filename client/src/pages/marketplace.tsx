@@ -194,11 +194,16 @@ function ListingCard({ listing, index }: { listing: ListingItem; index: number }
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
-  const { estateId } = useCurrentEstate();
+  const { estateId, propertyId, isPersonalMode } = useCurrentEstate();
 
+  // Always build a unique URL per context so React Query never serves a stale
+  // cross-context cache hit. Only estateId contexts return real data; property
+  // and personal contexts return [] from the backend.
   const listingsUrl = estateId
     ? `/api/marketplace/listings?estateId=${estateId}`
-    : "/api/marketplace/listings";
+    : isPersonalMode
+      ? `/api/marketplace/listings?context=personal`
+      : `/api/marketplace/listings?context=property-${propertyId}`;
 
   const { data: listings = [], isLoading, isError } = useQuery<ListingItem[]>({
     queryKey: [listingsUrl],
