@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, User, ArrowRight, Sparkles, Eye, EyeOff, Briefcase, Phone, Globe, X, ChevronDown, Building2, MapPin, CheckCircle2 } from "lucide-react";
-import { SiGoogle } from "react-icons/si";
 import koneksiLogo from "@assets/Koneksi_logo_1773055266438.png";
 
 import { SERVICE_OPTIONS } from "@shared/schema";
@@ -157,17 +156,9 @@ export default function AuthPage() {
     }
   };
 
-  const handleGoogleAuth = () => {
-    toast({
-      title: "Coming Soon",
-      description: "Google sign-in will be available shortly.",
-    });
-  };
-
   const isSupplierMode = mode === "register" && registerType === "supplier";
   const isEstateMode = mode === "register" && registerType === "estate";
   const isResidentMode = mode === "register" && registerType === "resident";
-  const showGoogle = mode === "login";
 
   const inputClass = "pl-10 bg-white/10 border-white/15 text-white placeholder:text-white/40 rounded-xl focus:ring-2 focus:ring-white/30 focus:border-transparent";
 
@@ -279,25 +270,6 @@ export default function AuthPage() {
               </motion.div>
             )}
           </AnimatePresence>
-
-          {showGoogle && (
-            <>
-              <button
-                onClick={handleGoogleAuth}
-                data-testid="button-google-auth"
-                className="w-full flex items-center justify-center gap-3 py-3 rounded-xl bg-white/10 border border-white/15 text-white font-medium text-sm hover:bg-white/15 transition-all duration-200 mb-5"
-              >
-                <SiGoogle className="w-4 h-4" />
-                Continue with Google
-              </button>
-
-              <div className="flex items-center gap-3 mb-5">
-                <div className="flex-1 h-px bg-white/20" />
-                <span className="text-white/40 text-xs uppercase tracking-wider">or</span>
-                <div className="flex-1 h-px bg-white/20" />
-              </div>
-            </>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <AnimatePresence mode="wait">
