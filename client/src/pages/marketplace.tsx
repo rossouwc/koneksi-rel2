@@ -12,6 +12,7 @@ import {
   Mail,
   Globe,
   AlertCircle,
+  Images,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,7 @@ interface ListingItem {
   description: string;
   listingType: string;
   imageUrl: string | null;
+  additionalPhotos: string[] | null;
   price: number | null;
   originalPrice: number | null;
   validFrom: string | null;
@@ -115,6 +117,28 @@ function ListingCard({ listing, index }: { listing: ListingItem; index: number }
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               loading="lazy"
             />
+            {listing.additionalPhotos && listing.additionalPhotos.length > 0 && (
+              <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 text-white rounded-full px-2 py-0.5 text-[10px] font-medium">
+                <Images className="w-3 h-3" />
+                +{listing.additionalPhotos.length}
+              </div>
+            )}
+          </div>
+        )}
+        {!listing.imageUrl && listing.additionalPhotos && listing.additionalPhotos.length > 0 && (
+          <div className="relative aspect-[16/9] overflow-hidden bg-muted/30 shrink-0">
+            <img
+              src={listing.additionalPhotos[0]}
+              alt={listing.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+            />
+            {listing.additionalPhotos.length > 1 && (
+              <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 text-white rounded-full px-2 py-0.5 text-[10px] font-medium">
+                <Images className="w-3 h-3" />
+                +{listing.additionalPhotos.length - 1}
+              </div>
+            )}
           </div>
         )}
         <div className="p-4 flex flex-col flex-1">

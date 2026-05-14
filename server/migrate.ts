@@ -21,6 +21,7 @@ export async function runMigrations(): Promise<void> {
       description text NOT NULL,
       listing_type text NOT NULL DEFAULT 'promotion',
       image_url text,
+      additional_photos text[] DEFAULT '{}',
       price integer,
       original_price integer,
       valid_from timestamp,

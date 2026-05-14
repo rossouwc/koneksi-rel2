@@ -2128,6 +2128,7 @@ export async function registerRoutes(
     description: z.string().min(1),
     listingType: z.enum(["promotion", "service", "product", "combo", "announcement"]).default("promotion"),
     imageUrl: z.string().nullable().optional(),
+    additionalPhotos: z.array(z.string()).optional(),
     price: z.number().int().nonnegative().nullable().optional(),
     originalPrice: z.number().int().nonnegative().nullable().optional(),
     validFrom: z.string().datetime({ offset: true }).nullable().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional()),
@@ -2151,6 +2152,7 @@ export async function registerRoutes(
         description: d.description,
         listingType: d.listingType,
         imageUrl: d.imageUrl ?? null,
+        additionalPhotos: d.additionalPhotos ?? [],
         price: d.price ?? null,
         originalPrice: d.originalPrice ?? null,
         validFrom: d.validFrom ? new Date(d.validFrom) : null,
@@ -2176,6 +2178,7 @@ export async function registerRoutes(
       if (d.description !== undefined) data.description = d.description;
       if (d.listingType !== undefined) data.listingType = d.listingType;
       if (d.imageUrl !== undefined) data.imageUrl = d.imageUrl ?? null;
+      if (d.additionalPhotos !== undefined) data.additionalPhotos = d.additionalPhotos ?? [];
       if (d.price !== undefined) data.price = d.price ?? null;
       if (d.originalPrice !== undefined) data.originalPrice = d.originalPrice ?? null;
       if (d.validFrom !== undefined) data.validFrom = d.validFrom ? new Date(d.validFrom) : null;

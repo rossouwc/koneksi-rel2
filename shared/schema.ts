@@ -217,6 +217,7 @@ export const marketplaceListings = pgTable("marketplace_listings", {
   description: text("description").notNull(),
   listingType: text("listing_type").notNull().default("promotion"),
   imageUrl: text("image_url"),
+  additionalPhotos: text("additional_photos").array().default([]),
   price: integer("price"),
   originalPrice: integer("original_price"),
   validFrom: timestamp("valid_from"),
